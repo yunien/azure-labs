@@ -5,7 +5,7 @@
         "keyVaultAdmin": {
             "type": "string",
             "metadata": {
-                "description": "The object ID of the user or group who will have full permissons on Azure Key Vault"
+                "description": "The object ID of the user(from AAD) or group who will have full permissons on Azure Key Vault"
             }
         },
         "location": {
@@ -69,13 +69,35 @@
                 "description": "Password for the VMs that are created"
             }
         },
+        "defenderPricingTier": {
+            "type": "string",
+            "metadata": {
+                "description": "Defender plans for Defender cloud"
+            },
+            "allowedValues": [
+                "Standard",
+                "Free"
+            ],
+            "defaultValue": "Standard"
+        },
+        "autoProvision": {
+            "type": "string",
+            "metadata": {
+                "description": "Defender plans for Defender cloud"
+            },
+            "allowedValues": [
+                "On",
+                "Off"
+            ],
+            "defaultValue": "On"
+        },
         "tags": {
             "type": "object",
             "metadata": {
                 "description": "The tags that wil be associated to the resources"
             },
             "defaultValue": {
-                "environment": "lab"
+                "environment": "lab", "creater": "electrum"
             }
         },
         "uniqueData": {
@@ -116,7 +138,11 @@
         "workloadVnetCidr": "10.2.0.0/16",
         "workloadVnetSubnetAppCidr": "10.2.0.0/24",
         "workloadVnetSubnetDataCidr": "10.2.1.0/24",
-        "workloadVnetSubnetSvcCidr": "10.2.2.0/24"
+        "workloadVnetSubnetSvcCidr": "10.2.2.0/24",
+        "transitDefenderDeploymentName": "[concat('deploy-transit-defender',parameters('uniqueData'))]",
+        "defenderTemplateFile": "[concat(variables('sharedSvcTemplatesUri'), 'deploy-defender-plans.json')]",
+        "defenderPlansApiVersion": "2018-06-01",
+        "autoProvisionApiVersion": "2017-08-01-preview"
     },
     "resources": [
         {
@@ -247,6 +273,175 @@
                     "contentVersion": "1.0.0.0"
                 }
             }
+        },
+        {
+            "name": "[variables('transitDefenderDeploymentName')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "[variables('resourcesApiVersion')]",
+            "subscriptionId": "[parameters('transitSubscriptionId')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "type": "Microsoft.Security/autoProvisioningSettings",
+                            "name": "default",
+                            "apiVersion": "[variables('autoProvisionApiVersion')]",
+                            "location": "[parameters('location')]",
+                            "properties": {
+                                "autoProvision": "[parameters('autoProvision')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/workspaceSettings",
+                            "apiVersion": "[variables('autoProvisionApiVersion')]",
+                            "name": "default",
+                            "location": "[parameters('location')]",
+                            "properties": {
+                                "workspaceId": "[concat('/subscriptions/', parameters('transitSubscriptionId'), '/resourceGroups/', variables('transitRgName'), '/providers/Microsoft.OperationalInsights/workspaces/', reference(variables('transitRgDeploymentName')).outputs.lawName.value)]",
+                                "scope": "[subscription().id]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "AppServices",
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "SqlServers",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/AppServices')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "SqlServerVirtualMachines",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/SqlServers')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "StorageAccounts",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/SqlServerVirtualMachines')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "KubernetesService",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/StorageAccounts')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "ContainerRegistry",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/KubernetesService')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "KeyVaults",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/ContainerRegistry')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "Arm",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/KeyVaults')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "Dns",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/Arm')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "[variables('defenderPlansApiVersion')]",
+                            "name": "VirtualMachines",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/Dns')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('defenderPricingTier')]"
+                            }
+                        }
+                    ]
+                }
+            }
+            // "dependsOn": [
+            //     "[concat('Microsoft.Resources/deployments/', variables('transitRgDeploymentName'))]"
+            // ],
+            // "properties": {
+            //     "mode": "Incremental",
+            //     "parameters": {
+            //         "pricingTier": {
+            //             "value": "[parameters('defenderPricingTier')]"
+            //         },
+            //         "autoProvision": {
+            //             "value": "[parameters('autoProvision')]"
+            //         },
+            //         "lawName": {
+            //             "value": "[reference(variables('transitRgDeploymentName')).outputs.lawName.value]"
+            //         },
+            //         "lawRgName": {
+            //             "value": "[variables('transitRgName')]"
+            //         },
+            //         "lawSubscriptionId": {
+            //             "value": "[parameters('transitSubscriptionId')]"
+            //         }
+            //     },
+            //     "templateLink": {
+            //         "uri": "[variables('defenderTemplateFile')]",
+            //         "contentVersion": "1.0.0.0"
+            //     }
+            // }
         },
         {
             "name": "[variables('sharedSvcRgDeploymentName')]",

@@ -1,0 +1,176 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "pricingTier": {
+            "type": "string",
+            "allowedValues": [
+                "Standard",
+                "Free"
+            ],
+            "metadata": {
+                "description": "Specify whether you want to enable Standard tier for ALL resource type"
+            }
+        },
+        "autoProvision": {
+            "type": "string",
+            "allowedValues": [
+                "On",
+                "Off"
+            ],
+            "metadata": {
+                "description": "enable all extensions Auto provisioning in defender for cloud"
+            }
+        },
+        "lawName": {
+            "type": "string",
+            "metadata": {
+                "description": "Specify the name of your Log Analytics workspace to collect ASC data."
+            }
+        },
+        "lawRgName": {
+            "type": "string",
+            "metadata": {
+                "description": "transit resource group name where the Log Analytics workspace is deployed."
+            }
+        },
+        "lawSubscriptionId": {
+            "type": "string",
+            "metadata": {
+                "description": "transit subscription Id where the Log Analytics workspace is deployed."
+            }
+        }
+    },
+    "functions": [],
+    "variables": {
+        "defenderPlansApiVersion": "2018-06-01",
+        "autoProvisionApiVersion": "2017-08-01-preview"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Security/autoProvisioningSettings",
+            "name": "default",
+            "apiVersion": "[variables('autoProvisionApiVersion')]",
+            "properties": {
+                "autoProvision": "[parameters('autoProvision')]" //"Off"
+            }
+        },
+        {
+            "type": "Microsoft.Security/workspaceSettings",
+            "apiVersion": "[variables('autoProvisionApiVersion')]",
+            "name": "default",
+            "properties": {
+                "workspaceId": "[concat('/subscriptions/', parameters('lawSubscriptionId'), '/resourceGroups/', parameters('lawRgName'), '/providers/Microsoft.OperationalInsights/workspaces/', parameters('lawName'))]",
+                "scope": "[subscription().id]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "AppServices",
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "SqlServers",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/AppServices')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "SqlServerVirtualMachines",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/SqlServers')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "StorageAccounts",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/SqlServerVirtualMachines')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "KubernetesService",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/StorageAccounts')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "ContainerRegistry",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/KubernetesService')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "KeyVaults",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/ContainerRegistry')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "Arm",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/KeyVaults')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "Dns",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/Arm')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        },
+        {
+            "type": "Microsoft.Security/pricings",
+            "apiVersion": "[variables('defenderPlansApiVersion')]",
+            "name": "VirtualMachines",
+            "dependsOn": [
+                "[concat('Microsoft.Security/pricings/Dns')]"
+            ],
+            "properties": {
+                "pricingTier": "[parameters('pricingTier')]"
+            }
+        }
+    ],
+    "outputs": {}
+}
