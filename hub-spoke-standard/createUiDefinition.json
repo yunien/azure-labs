@@ -1,0 +1,93 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+    "handler": "Microsoft.Azure.CreateUIDef",
+    "version": "0.1.2-preview",
+    "parameters": {
+        "config": {
+            "isWizard": true,
+            "basics": {
+                "description": "hub & spoke in Electrum",
+                "subscription": {},
+                "resourceGroup": {
+                    "description": "not use"
+                },
+                "location": {
+                    "visible": false
+                }
+            }
+        },
+        "basics": [
+            {
+                "name": "envName",
+                "type": "Microsoft.Common.TextBox",
+                "label": "env",
+                "defaultValue": "dev",
+                "constraints": {
+                    "required": true
+                }
+            },
+            {
+                "name": "uniqueData",
+                "type": "Microsoft.Common.TextBox",
+                "label": "unique Data",
+                "defaultValue": "[substring(guid(),0,8)]",
+                "constraints": {
+                    "required": true
+                }
+            }
+        ],
+        "steps": [
+            {
+                "name": "transitVnet",
+                "label": "transit Vnet",
+                "elements": [
+					{
+						"name": "transitSubscriptionId",
+						"type": "Microsoft.Common.TextBox",
+						"label": "transit Subscriptins Id",
+						"defaultValue": "[subscription().subscriptionId]",
+						"constraints": {
+							"required": true
+						}
+					},
+                    {
+						"name": "transitRegion",
+						"type": "Microsoft.Common.TextBox",
+						"label": "transit region",
+						"defaultValue": "[resourceGroup().location]",
+						"constraints": {
+							"required": true
+						}
+					}
+                ]
+            },
+            {
+                "name": "sharedVnet",
+                "label": "Shared Vnet",
+                "elements": [
+                    {
+						"name": "sharedSubscriptinsId",
+						"type": "Microsoft.Common.TextBox",
+						"label": "shared Subscriptins Id",
+						"defaultValue": "[subscription().subscriptionId]",
+						"constraints": {
+							"required": true
+						}
+					},
+                    {
+						"name": "sharedRegion",
+						"type": "Microsoft.Common.TextBox",
+						"label": "shared region",
+						"defaultValue": "[resourceGroup().location]",
+						"constraints": {
+							"required": true
+						}
+					}
+                ]
+            }
+        ],
+        "outputs": {
+            "envName": "[basics('envName')]"
+        }
+    }
+}
