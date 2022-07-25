@@ -1,5 +1,5 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
         "envName": {
@@ -8,10 +8,20 @@
                 "description": "env"
             }
         },
-        "uniqueData": {
+        "suffix": {
             "type": "string",
             "metadata": {
-                "description": "unique Data"
+                "description": "suffix string"
+            }
+        },
+        "tags": {
+            "type": "object",
+            "metadata": {
+                "description": "The tags that wil be associated to the resources"
+            },
+            "defaultValue": {
+                "environment": "lab",
+                "creater": "electrum"
             }
         },
         "transitSubscriptionId": {
@@ -26,7 +36,7 @@
                 "description": "transit region"
             }
         },
-        "sharedSubscriptinsId": {
+        "sharedSubscriptionId": {
             "type": "string",
             "metadata": {
                 "description": "shared Subscriptins Id"
@@ -40,64 +50,72 @@
         }
     },
     "variables": {
-        "resourcesApiVersion": "2020-06-01",
-        "suffix": "[concat(parameters('envName'),'-',parameters('uniqueData'))]",
-        "rgTransitName": "[concat('rg-transit-',variables('suffix'))]",
+        "makeSuffix": "[concat(parameters('envName'),'-',parameters('suffix'))]",
+        "rgTransitName": "[concat('rg-transit-',variables('makeSuffix'))]",
         "transitSubDeploymentName": "[concat('deploy-',variables('rgTransitName'))]",
-        "rgSharedName": "[concat('rg-transit-',variables('suffix'))]",
+        "rgSharedName": "[concat('rg-shared-',variables('makeSuffix'))]",
         "sharedSubDeploymentName": "[concat('deploy-',variables('rgSharedName'))]"
     },
     "resources": [
         {
-            "name": "[variables('transitSubDeploymentName')]",
             "type": "Microsoft.Resources/deployments",
-            "apiVersion": "[variables('resourcesApiVersion')]",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('transitSubDeploymentName')]",
             "location": "[parameters('transitRegion')]",
             "subscriptionId": "[parameters('transitSubscriptionId')]",
             "properties": {
                 "mode": "Incremental",
                 "template": {
-                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
                     "contentVersion": "1.0.0.0",
                     "resources": [
                         {
-                            "name": "[variables('rgTransitName')]",
                             "type": "Microsoft.Resources/resourceGroups",
-                            "apiVersion": "[variables('resourcesApiVersion')]",
+                            "apiVersion": "2021-04-01",
+                            "name": "[variables('rgTransitName')]",
                             "location": "[parameters('transitRegion')]",
-                            //"tags": "[parameters('tags')]",
-                            "properties": {
-                            }
+                            "tags": "[parameters('tags')]",
+                            "managedBy": "",
+                            "properties": {}
                         }
                     ]
                 }
             }
         },
         {
-            "name": "[variables('sharedSubDeploymentName')]",
             "type": "Microsoft.Resources/deployments",
-            "apiVersion": "[variables('resourcesApiVersion')]",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('sharedSubDeploymentName')]",
             "location": "[parameters('sharedRegion')]",
-            "subscriptionId": "[parameters('sharedSubscriptinsId')]",
+            "subscriptionId": "[parameters('sharedSubscriptionId')]",
             "properties": {
                 "mode": "Incremental",
                 "template": {
-                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
                     "contentVersion": "1.0.0.0",
                     "resources": [
                         {
-                            "name": "[variables('rgSharedName')]",
                             "type": "Microsoft.Resources/resourceGroups",
-                            "apiVersion": "[variables('resourcesApiVersion')]",
+                            "apiVersion": "2021-04-01",
+                            "name": "[variables('rgSharedName')]",
                             "location": "[parameters('sharedRegion')]",
-                            //"tags": "[parameters('tags')]",
-                            "properties": {
-                            }
+                            "tags": "[parameters('tags')]",
+                            "managedBy": "",
+                            "properties": {}
                         }
                     ]
                 }
             }
         }
     ],
-    "outputs": {}
-  }
+    "outputs": {
+        "transitResourceGroupName": {
+            "type": "string",
+            "value": "[variables('rgTransitName')]"
+        },
+        "sharedResourceGroupName": {
+            "type": "string",
+            "value": "[variables('rgSharedName')]"
+        }
+    }
+}

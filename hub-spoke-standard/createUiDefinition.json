@@ -6,13 +6,13 @@
         "config": {
             "isWizard": true,
             "basics": {
-                "description": "hub & spoke in Electrum",
-                "subscription": {},
-                "resourceGroup": {
-                    "description": "not use"
-                },
+                "description": "**Azure Sentinel All-In-One** deployment, see more information about this project [here](https://github.com/Azure/Azure-Sentinel/Tools/Sentinel-All-In-One/).",
                 "location": {
-                    "visible": false
+                    "label": "Location",
+                    "toolTip": "Location for all resources",
+                    "resourceTypes": [
+                        "Microsoft.OperationalInsights"
+                    ]
                 }
             }
         },
@@ -22,18 +22,26 @@
                 "type": "Microsoft.Common.TextBox",
                 "label": "env",
                 "defaultValue": "dev",
+                "toolTip": "The env name should include 1-8 letters or digits.",
                 "constraints": {
-                    "required": true
-                }
+                    "required": true,
+                    "regex": "^[A-Za-z0-9]{1,8}$",
+                    "validationMessage": "env name are allowed, and the value must be 1-8 characters long."
+                },
+                "visible": true
             },
             {
-                "name": "uniqueData",
+                "name": "suffix",
                 "type": "Microsoft.Common.TextBox",
-                "label": "unique Data",
+                "label": "suffix",
                 "defaultValue": "[substring(guid(),0,8)]",
+                "toolTip": "The suffix name should include 0-8 letters or digits.",
                 "constraints": {
-                    "required": true
-                }
+                    "required": true,
+                    "regex": "^[A-Za-z0-9]+$",
+                    "validationMessage": "suffix are allowed, and the value must be 1-8 characters long."
+                },
+                "visible": true
             }
         ],
         "steps": [
@@ -41,53 +49,80 @@
                 "name": "transitVnet",
                 "label": "transit Vnet",
                 "elements": [
-					{
-						"name": "transitSubscriptionId",
-						"type": "Microsoft.Common.TextBox",
-						"label": "transit Subscriptins Id",
-						"defaultValue": "[subscription().subscriptionId]",
-						"constraints": {
-							"required": true
-						}
-					},
                     {
-						"name": "transitRegion",
-						"type": "Microsoft.Common.TextBox",
-						"label": "transit region",
-						"defaultValue": "[resourceGroup().location]",
-						"constraints": {
-							"required": true
-						}
-					}
+                        "name": "transitSubscriptionId",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "transit Subscriptins Id",
+                        "placeholder": "",
+                        "defaultValue": "[subscription().subscriptionId]",
+                        "toolTip": "default is subscriptionId",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$",
+                            "validationMessage": "should be subscription Id"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "transitRegion",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "transit region",
+                        "placeholder": "",
+                        "defaultValue": "[resourceGroup().location]",
+                        "toolTip": "default is resource group location",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[A-Za-z0-9 ]+$",
+                            "validationMessage": "should be location"
+                        },
+                        "visible": true
+                    }
                 ]
             },
             {
                 "name": "sharedVnet",
-                "label": "Shared Vnet",
+                "label": "shared Vnet",
                 "elements": [
                     {
-						"name": "sharedSubscriptinsId",
-						"type": "Microsoft.Common.TextBox",
-						"label": "shared Subscriptins Id",
-						"defaultValue": "[subscription().subscriptionId]",
-						"constraints": {
-							"required": true
-						}
-					},
+                        "name": "sharedSubscriptionId",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "shared Subscriptins Id",
+                        "placeholder": "",
+                        "defaultValue": "[subscription().subscriptionId]",
+                        "toolTip": "default is subscriptionId",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$",
+                            "validationMessage": "should be subscription Id"
+                        },
+                        "visible": true
+                    },
                     {
-						"name": "sharedRegion",
-						"type": "Microsoft.Common.TextBox",
-						"label": "shared region",
-						"defaultValue": "[resourceGroup().location]",
-						"constraints": {
-							"required": true
-						}
-					}
+                        "name": "sharedRegion",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "shared region",
+                        "placeholder": "",
+                        "defaultValue": "[resourceGroup().location]",
+                        "toolTip": "default is resource group location",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[A-Za-z0-9 ]+$",
+                            "validationMessage": "should be location"
+                        },
+                        "visible": true
+                    }
                 ]
             }
         ],
         "outputs": {
-            "envName": "[basics('envName')]"
+            "envName": "[basics('envName')]",
+            "suffix": "[basics('suffix')]",
+            "tags": "[basics('tags')]",
+            "transitSubscriptionId": "[steps('transitVnet').transitSubscriptionId]",
+            "transitRegion": "[steps('transitVnet').transitRegion]",
+            "sharedSubscriptionId": "[steps('sharedVnet').sharedSubscriptionId]",
+            "sharedRegion": "[steps('sharedVnet').sharedRegion]",
+            "location": "[location()]"
         }
     }
 }
