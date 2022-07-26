@@ -1,0 +1,101 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object",
+            "metadata": {
+                "description": "The tags that will be associated to the resources"
+            },
+            "defaultValue": {
+                "environment": "lab"
+            }
+        },
+        "suffix": {
+            "type": "string",
+            "metadata": {
+                "description": "Data used to append to resources to ensure uniqueness"
+            },
+            "defaultValue": "[substring(newGuid(),0,8)]"
+        },
+        "location": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "laWorkspaceName": "[concat('law-', parameters('suffix'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('transitVnetName')]",
+            "location": "[variables('location')]",
+            "tags": "[parameters('tags')]",
+            "extendedLocation": {
+                "name": "string",
+                "type": "EdgeZone"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [ "[variables('hubVnetPrefix')]" ]
+                },
+                "enableDdosProtection": false,
+                "enableVmProtection": false,
+                "subnets": [],
+                "virtualNetworkPeerings": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "name": "[variables('gatewaySubnetName')]",
+            "apiVersion": "2021-08-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('gatewaySubnetName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[parameters('transitGatewaySubnetCidr')]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "name": "[variables('bastionSubnetName')]",
+            "apiVersion": "2021-08-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('bastionSubnetName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[parameters('transitBastionSubnetCidr')]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "name": "[variables('fwPayloadSubnetName')]",
+            "apiVersion": "2021-08-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('fwPayloadSubnetName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[parameters('transitFwSubnetPayCidr')]"
+            }
+        }
+    ],
+    "outputs": {
+        "logAnalyticsName": {
+            "type": "string",
+            "value": "[variables('laWorkspaceName')]"
+        },
+        "logAnalyticsResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('laWorkspaceName'))]"
+        },
+        "logAnalyticsWorkspaceId": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces',variables('laWorkspaceName')),'2021-12-01-preview').customerId]"
+        },
+        "logAnalyticsWorkspaceKey": {
+            "type": "string",
+            "value": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', variables('laWorkspaceName')), '2021-12-01-preview').primarySharedKey]"
+        }
+    }
+}

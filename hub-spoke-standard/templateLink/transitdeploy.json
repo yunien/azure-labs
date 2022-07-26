@@ -1,0 +1,84 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object"
+        },
+        "location": {
+            "type": "string"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "transitVnetCidr": {
+            "type": "string"
+        },
+        "transitGatewaySubnetCidr": {
+            "type": "string"
+        },
+        "transitBastionSubnetCidr": {
+            "type": "string"
+        },
+        "transitFwSubnetCidr": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "transitVnettName": "[concat('vnet-transit-', parameters('makeSuffix'))]",
+        "gatewaySubnetName": "GatewaySubnet",
+        "bastionSubnetName": "AzureBastionSubnet",
+        "fwPayloadSubnetName": "AzureFirewallSubnet"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('transitVnettName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [ "[parameters('transitVnetCidr')]" ]
+                },
+                "enableDdosProtection": false,
+                "enableVmProtection": false
+            }
+        },
+        {
+            "comments": "gateway subnet",
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "name": "[concat(variables('transitVnettName'), '/', variables('gatewaySubnetName'))]",
+            "apiVersion": "2021-08-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('transitVnettName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[parameters('transitGatewaySubnetCidr')]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "name": "[concat(variables('transitVnettName'), '/', variables('bastionSubnetName'))]",
+            "apiVersion": "2021-08-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnettName'), variables('gatewaySubnetName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[parameters('transitBastionSubnetCidr')]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "name": "[concat(variables('transitVnettName'), '/', variables('fwPayloadSubnetName'))]",
+            "apiVersion": "2021-08-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnettName'), variables('bastionSubnetName'))]"
+            ],
+            "properties": {
+                "addressPrefix": "[parameters('transitFwSubnetCidr')]"
+            }
+        }
+    ],
+    "outputs": {}
+}

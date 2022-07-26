@@ -1,5 +1,5 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
         "envName": {
@@ -24,98 +24,198 @@
                 "creater": "electrum"
             }
         },
-        "transitSubscriptionId": {
+        "location": {
             "type": "string",
             "metadata": {
-                "description": "transit Subscriptins Id"
+                "description": "Location of the resource group"
+            },
+            "defaultValue": "[deployment().location]"
+        },
+        "transitVnetCidr": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
             }
         },
-        "transitRegion": {
+        "transitGatewaySubnetCidr": {
             "type": "string",
             "metadata": {
-                "description": "transit region"
+                "description": "description"
             }
         },
-        "sharedSubscriptionId": {
+        "transitBastionSubnetCidr": {
             "type": "string",
             "metadata": {
-                "description": "shared Subscriptins Id"
+                "description": "description"
             }
         },
-        "sharedRegion": {
+        "transitFwSubnetCidr": {
             "type": "string",
             "metadata": {
-                "description": "shared region"
+                "description": "description"
             }
         }
     },
     "variables": {
-        "makeSuffix": "[concat(parameters('envName'),'-',parameters('suffix'))]",
-        "rgTransitName": "[concat('rg-transit-',variables('makeSuffix'))]",
-        "transitSubDeploymentName": "[concat('deploy-',variables('rgTransitName'))]",
-        "rgSharedName": "[concat('rg-shared-',variables('makeSuffix'))]",
-        "sharedSubDeploymentName": "[concat('deploy-',variables('rgSharedName'))]"
+        "makeSuffix": "[concat(parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
+        "transitDeploymentName": "[concat('deploy-transit-',variables('makeSuffix'))]",
+        "transitTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'templateLink/transitdeploy.json')]"
     },
     "resources": [
         {
-            "type": "Microsoft.Resources/deployments",
+            "type": "Microsoft.Resources/resourceGroups",
             "apiVersion": "2021-04-01",
-            "name": "[variables('transitSubDeploymentName')]",
-            "location": "[parameters('transitRegion')]",
-            "subscriptionId": "[parameters('transitSubscriptionId')]",
-            "properties": {
-                "mode": "Incremental",
-                "template": {
-                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-                    "contentVersion": "1.0.0.0",
-                    "resources": [
-                        {
-                            "type": "Microsoft.Resources/resourceGroups",
-                            "apiVersion": "2021-04-01",
-                            "name": "[variables('rgTransitName')]",
-                            "location": "[parameters('transitRegion')]",
-                            "tags": "[parameters('tags')]",
-                            "managedBy": "",
-                            "properties": {}
-                        }
-                    ]
-                }
-            }
+            "name": "[concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
+            "location": "[parameters('location')]",
+            "properties": {}
         },
         {
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2021-04-01",
-            "name": "[variables('sharedSubDeploymentName')]",
-            "location": "[parameters('sharedRegion')]",
-            "subscriptionId": "[parameters('sharedSubscriptionId')]",
+            "name": "[variables('transitDeploymentName')]",
+            "resourceGroup": "[concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/resourceGroups', concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix')))]"
+            ],
             "properties": {
                 "mode": "Incremental",
-                "template": {
-                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-                    "contentVersion": "1.0.0.0",
-                    "resources": [
-                        {
-                            "type": "Microsoft.Resources/resourceGroups",
-                            "apiVersion": "2021-04-01",
-                            "name": "[variables('rgSharedName')]",
-                            "location": "[parameters('sharedRegion')]",
-                            "tags": "[parameters('tags')]",
-                            "managedBy": "",
-                            "properties": {}
-                        }
-                    ]
+                "templateLink": {
+                    "uri": "[variables('transitTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[variables('makeSuffix')]"
+                    },
+                    "transitVnetCidr": {
+                        "value": "[parameters('transitVnetCidr')]"
+                    },
+                    "transitGatewaySubnetCidr": {
+                        "value": "[parameters('transitGatewaySubnetCidr')]"
+                    },
+                    "transitBastionSubnetCidr": {
+                        "value": "[parameters('transitBastionSubnetCidr')]"
+                    },
+                    "transitFwSubnetCidr": {
+                        "value": "[parameters('transitFwSubnetCidr')]"
+                    }
                 }
+                // "template": {
+                //     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                //     "contentVersion": "1.0.0.0",
+                //     "parameters": {},
+                //     "variables": {},
+                //     "resources": [
+                //         {
+                //             "type": "Microsoft.Storage/storageAccounts",
+                //             "apiVersion": "2021-04-01",
+                //             "name": "[variables('storageName')]",
+                //             "location": "[parameters('transitRegion')]",
+                //             "sku": {
+                //                 "name": "Standard_LRS"
+                //             },
+                //             "kind": "Storage",
+                //             "properties": {
+                //             }
+                //         },
+                //         {
+                //             "type": "Microsoft.OperationalInsights/workspaces",
+                //             "apiVersion": "2021-12-01-preview",
+                //             "name": "[variables('lawDeploymentName')]",
+                //             "location": "[parameters('transitRegion')]",
+                //             "tags": "[parameters('tags')]",
+                //             "properties": {
+                //                 "publicNetworkAccessForIngestion": "Enabled",
+                //                 "publicNetworkAccessForQuery": "Enabled",
+                //                 "retentionInDays": 30,
+                //                 "sku": {
+                //                     "name": "PerGB2018"
+                //                 },
+                //                 "workspaceCapping": {
+                //                     "dailyQuotaGb": 1
+                //                 }
+                //             }
+                //         }
+                //     ]
+                // }
             }
         }
+        // {
+        //     "type": "Microsoft.Resources/deployments",
+        //     "apiVersion": "2021-04-01",
+        //     "name": "[variables('transitDeploymentName')]",
+        //     "resourceGroup": "[concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
+        //     "dependsOn": [
+        //         "[resourceId('Microsoft.Resources/resourceGroups', concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix')))]"
+        //     ],
+        //     "properties": {
+        //         "mode": "Incremental",
+        //         "templateLink": {
+        //             "uri": "[variables('transitTemplateUrl')]",
+        //             "contentVersion": "1.0.0.0"
+        //         },
+        //         "parameters": {
+        //             "makeSuffix": {
+        //                 "value": "[variables('makeSuffix')]"
+        //             },
+        //             "location": {
+        //                 "value": "[parameters('location')]"
+        //             },
+        //             "tags": {
+        //                 "value": "[parameters('tags')]"
+        //             }
+        //         }
+        //         // "template": {
+        //         //     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+        //         //     "contentVersion": "1.0.0.0",
+        //         //     "parameters": {},
+        //         //     "variables": {},
+        //         //     "resources": [
+        //         //         {
+        //         //             "type": "Microsoft.Storage/storageAccounts",
+        //         //             "apiVersion": "2021-04-01",
+        //         //             "name": "[variables('storageName')]",
+        //         //             "location": "[parameters('transitRegion')]",
+        //         //             "sku": {
+        //         //                 "name": "Standard_LRS"
+        //         //             },
+        //         //             "kind": "Storage",
+        //         //             "properties": {
+        //         //             }
+        //         //         },
+        //         //         {
+        //         //             "type": "Microsoft.OperationalInsights/workspaces",
+        //         //             "apiVersion": "2021-12-01-preview",
+        //         //             "name": "[variables('lawDeploymentName')]",
+        //         //             "location": "[parameters('transitRegion')]",
+        //         //             "tags": "[parameters('tags')]",
+        //         //             "properties": {
+        //         //                 "publicNetworkAccessForIngestion": "Enabled",
+        //         //                 "publicNetworkAccessForQuery": "Enabled",
+        //         //                 "retentionInDays": 30,
+        //         //                 "sku": {
+        //         //                     "name": "PerGB2018"
+        //         //                 },
+        //         //                 "workspaceCapping": {
+        //         //                     "dailyQuotaGb": 1
+        //         //                 }
+        //         //             }
+        //         //         }
+        //         //     ]
+        //         // }
+        //     }
+        // }
     ],
     "outputs": {
         "transitResourceGroupName": {
             "type": "string",
-            "value": "[variables('rgTransitName')]"
-        },
-        "sharedResourceGroupName": {
-            "type": "string",
-            "value": "[variables('rgSharedName')]"
+            "value": "[concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]"
         }
     }
 }
