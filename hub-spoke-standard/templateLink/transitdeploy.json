@@ -2,6 +2,18 @@
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
+        "cloudAddressSpace": {
+            "type": "string"
+        },
+        "sharedSubnetCidr": {
+            "type": "string"
+        },
+        "workloadVnetCidr": {
+            "type": "string"
+        },
+        "onPremisesAddressSpace": {
+            "type": "string"
+        },
         "tags": {
             "type": "object"
         },
@@ -9,6 +21,9 @@
             "type": "string"
         },
         "makeSuffix": {
+            "type": "string"
+        },
+        "networkWatcherRg": {
             "type": "string"
         },
         "transitVnetCidr": {
@@ -25,106 +40,202 @@
         }
     },
     "variables": {
-        "transitVnetName": "[concat('vnet-transit-', parameters('makeSuffix'))]",
-        "gatewaySubnetName": "GatewaySubnet",
-        "bastionSubnetName": "AzureBastionSubnet",
-        "fwPayloadSubnetName": "AzureFirewallSubnet",
-        "bastionPublicIpName": "[concat('pip-bst-', parameters('makeSuffix'))]",
-        "bastionName": "[concat('bst-', parameters('makeSuffix'))]",
-        "bastionSku": "Basic" // Basic or Standard
+        "bastionNsgName": "[concat('nsg-bst-', parameters('makeSuffix'))]",
+        "deployVnet": "[concat('deploy-vnet-transit-', parameters('makeSuffix'))]",
+        "deployVnetTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/transit-vnet.json')]",
+        "deploylawandst": "[concat('deploy-law-st-', parameters('makeSuffix'))]",
+        "deploylawandstTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/law-st.json')]",
+        "deployBastion": "[concat('deploy-bastion-', parameters('makeSuffix'))]",
+        "deployBastionTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/bastion.json')]",
+        "deployFirewall": "[concat('deploy-fw-', parameters('makeSuffix'))]",
+        "deployFirewallTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/firewall.json')]",
+        "deployFlowLogs": "[concat('deploy-flow-logs-', parameters('makeSuffix'))]",
+        "deployFlowLogsTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/flow-logs.json')]"
     },
     "resources": [
         {
-            "type": "Microsoft.Network/virtualNetworks",
-            "apiVersion": "2021-08-01",
-            "name": "[variables('transitVnetName')]",
-            "location": "[parameters('location')]",
-            "tags": "[parameters('tags')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deployVnet')]",
             "properties": {
-                "addressSpace": {
-                    "addressPrefixes": [ "[parameters('transitVnetCidr')]" ]
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deployVnetTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
                 },
-                "enableDdosProtection": false,
-                "enableVmProtection": false
-            }
-        },
-        {
-            "comments": "gateway subnet",
-            "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnetName'), '/', variables('gatewaySubnetName'))]",
-            "apiVersion": "2021-08-01",
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks', variables('transitVnetName'))]"
-            ],
-            "properties": {
-                "addressPrefix": "[parameters('transitGatewaySubnetCidr')]"
-            }
-        },
-        {
-            "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnetName'), '/', variables('bastionSubnetName'))]",
-            "apiVersion": "2021-08-01",
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('gatewaySubnetName'))]"
-            ],
-            "properties": {
-                "addressPrefix": "[parameters('transitBastionSubnetCidr')]"
-            }
-        },
-        {
-            "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnetName'), '/', variables('fwPayloadSubnetName'))]",
-            "apiVersion": "2021-08-01",
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('bastionSubnetName'))]"
-            ],
-            "properties": {
-                "addressPrefix": "[parameters('transitFwSubnetCidr')]"
-            }
-        },
-        {
-            "type": "Microsoft.Network/publicIPAddresses",
-            "apiVersion": "2021-08-01",
-            "name": "[variables('bastionPublicIpName')]",
-            "location": "[parameters('location')]",
-            "tags": "[parameters('tags')]",
-            "sku": {
-                "name": "Standard"
-            },
-            "properties": {
-                "publicIPAllocationMethod": "Static"
-            }
-        },
-        {
-            "type": "Microsoft.Network/bastionHosts",
-            "apiVersion": "2021-08-01",
-            "name": "[variables('bastionName')]",
-            "location": "[parameters('location')]",
-            "tags": "[parameters('tags')]",
-            "sku": {
-                "name": "[variables('bastionSku')]"
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/publicIpAddresses', variables('bastionPublicIpName'))]",
-                "[resourceId('Microsoft.Network/virtualNetworks', variables('transitVnetName'))]"
-            ],
-            "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "bastionConfig",
-                        "properties": {
-                            "privateIPAllocationMethod": "Dynamic",
-                            "publicIPAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('bastionPublicIpName'))]"
-                            },
-                            "subnet": {
-                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('bastionSubnetName'))]"
-                            }
-                        }
+                "parameters": {
+                    "transitVnetCidr": {
+                        "value": "[parameters('transitVnetCidr')]"
+                    },
+                    "transitGatewaySubnetCidr": {
+                        "value": "[parameters('transitGatewaySubnetCidr')]"
+                    },
+                    "transitBastionSubnetCidr": {
+                        "value": "[parameters('transitBastionSubnetCidr')]"
+                    },
+                    "transitFwSubnetCidr": {
+                        "value": "[parameters('transitFwSubnetCidr')]"
+                    },
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[parameters('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
                     }
-                ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deploylawandst')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/deployments/', variables('deployVnet'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deploylawandstTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[parameters('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deployBastion')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/deployments/', variables('deployVnet'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deployBastionTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "bastionSubnetId": {
+                        "value": "[reference(variables('deployVnet')).outputs.bastionSubnetId.value]"
+                    },
+                    "lawResourceId": {
+                        "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsResourceId.value]"
+                    },
+                    "bastionNsgName": {
+                        "value": "[variables('bastionNsgName')]"
+                    },
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[parameters('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deployFirewall')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/deployments/', variables('deployVnet'))]",
+                "[resourceId('Microsoft.Resources/deployments',variables('deploylawandst'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deployFirewallTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "cloudAddressSpace": {
+                        "value": "[parameters('cloudAddressSpace')]"
+                    },
+                    "sharedSubnetCidr": {
+                        "value": "[parameters('sharedSubnetCidr')]"
+                    },
+                    "workloadVnetCidr": {
+                        "value": "[parameters('workloadVnetCidr')]"
+                    },
+                    "onPremisesAddressSpace": {
+                        "value": "[parameters('onPremisesAddressSpace')]"
+                    },
+                    "fwPayloadSubnetId": {
+                        "value": "[reference(variables('deployVnet')).outputs.fwPayloadSubnetId.value]"
+                    },
+                    "lawResourceId": {
+                        "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsResourceId.value]"
+                    },
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[parameters('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deployFlowLogs')]",
+            "resourceGroup": "[parameters('networkWatcherRg')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/deployments/', variables('deployVnet'))]",
+                "[resourceId('Microsoft.Resources/deployments',variables('deploylawandst'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deployFlowLogsTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "lawResourceId": {
+                        "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsResourceId.value]"
+                    },
+                    "stResourceId": {
+                        "value": "[reference(variables('deploylawandst')).outputs.storageResourceId.value]"
+                    },
+                    "bastionNsgResourceId": {
+                        "value": "[reference(variables('deployBastion')).outputs.nsgResourceId.value]"
+                    },
+                    "bastionNsgName": {
+                        "value": "[variables('bastionNsgName')]"
+                    }
+                }
             }
         }
     ],
-    "outputs": {}
+    "outputs": {
+        "lawResourceId": {
+            "type": "string",
+            "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsResourceId.value]"
+        }
+    }
 }

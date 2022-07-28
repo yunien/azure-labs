@@ -1,0 +1,69 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object"
+        },
+        "location": {
+            "type": "string"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "adminObjectId": {
+            "type": "string"
+        },
+        "lawResourceId": {
+            "type": "string"
+        },
+        "vmAdminUsername": {
+            "type": "string"
+        },
+        "vmAdminPassword": {
+            "type": "securestring"
+        }
+    },
+    "variables": {
+        "deployKeyVaultCentral": "[concat('deploy-keyvault-central-', parameters('makeSuffix'))]",
+        "deployKeyVaultCentralTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'sharedLink/key-vault.json')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deployKeyVaultCentral')]",
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deployKeyVaultCentralTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[parameters('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "keyVaultAdminObjectId": {
+                        "value": "[parameters('adminObjectId')]"
+                    },
+                    "lawResourceId": {
+                        "value": "[parameters('lawResourceId')]"
+                    },
+                    "vmAdminUsername": {
+                        "type": "[parameters('vmAdminUsername')]"
+                    },
+                    "vmAdminPassword": {
+                        "type": "[parameters('vmAdminPassword')]"
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {}
+}

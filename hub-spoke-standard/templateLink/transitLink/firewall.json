@@ -1,0 +1,308 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "cloudAddressSpace": {
+            "type": "string"
+        },
+        "sharedSubnetCidr": {
+            "type": "string"
+        },
+        "workloadVnetCidr": {
+            "type": "string"
+        },
+        "onPremisesAddressSpace": {
+            "type": "string"
+        },
+        "fwPayloadSubnetId": {
+            "type": "string"
+        },
+        "lawResourceId": {
+            "type": "string"
+        },
+        "tags": {
+            "type": "object"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "fwPolicyName": "[concat('fw-policy-',parameters('makeSuffix'))]",
+        "firewallPublicIpName": "[concat('pip-fw-', parameters('makeSuffix'))]",
+        "firewallName": "[concat('fw-', parameters('makeSuffix'))]",
+        "firewallAz": [ "1", "2", "3" ]
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/firewallPolicies",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('fwPolicyName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIpAddresses', variables('firewallPublicIpName'))]"
+            ],
+            "properties": {
+                "dnsSettings": {
+                    "enableProxy": true
+                },
+                "sku": {
+                    "tier": "Standard"
+                },
+                "threatIntelMode": "Alert"
+            }
+        },
+        // {
+        //     "type": "Microsoft.Network/firewallPolicies/ruleCollectionGroups",
+        //     "apiVersion": "2021-08-01",
+        //     "name": "[format('{0}/{1}', variables('fwPolicyName'), 'DefaultDnatRuleCollectionGroup')]",
+        //     "dependsOn": [
+        //         "[resourceId('Microsoft.Network/firewallPolicies', variables('fwPolicyName'))]"
+        //     ],
+        //     "properties": {
+        //         "priority": 100,
+        //         "ruleCollections": []
+        //     }
+        // },
+        {
+            "type": "Microsoft.Network/firewallPolicies/ruleCollectionGroups",
+            "apiVersion": "2021-08-01",
+            "name": "[format('{0}/{1}', variables('fwPolicyName'), 'DefaultNetworkRuleCollectionGroup')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/firewallPolicies', variables('fwPolicyName'))]"
+            ],
+            "properties": {
+                "priority": 200,
+                "ruleCollections": [
+                    {
+                        "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                        "action": {
+                            "type": "Allow"
+                        },
+                        "name": "AllowWindowsVmRequired",
+                        "priority": 100,
+                        "rules": [
+                            {
+                                "ruleType": "NetworkRule",
+                                "name": "AllowKMSActivation",
+                                "ipProtocols": [
+                                    "TCP"
+                                ],
+                                "destinationPorts": [
+                                    "1688"
+                                ],
+                                "sourceAddresses": [
+                                    "[parameters('cloudAddressSpace')]"
+                                ],
+                                "sourceIpGroups": [],
+                                "destinationIpGroups": [],
+                                "destinationAddresses": [],
+                                "ruleConditionType": "NetworkRuleCondition",
+                                "destinationFqdns": [
+                                    "kms.core.windows.net"
+                                ]
+                            },
+                            {
+                                "name": "AllowNtp",
+                                "ipProtocols": [
+                                    "TCP"
+                                ],
+                                "destinationPorts": [
+                                    "123"
+                                ],
+                                "sourceAddresses": [
+                                    "[parameters('cloudAddressSpace')]"
+                                ],
+                                "sourceIpGroups": [],
+                                "destinationIpGroups": [],
+                                "destinationAddresses": [],
+                                "ruleConditionType": "NetworkRuleCondition",
+                                "ruleType": "NetworkRule",
+                                "destinationFqdns": [
+                                    "time.windows.com"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                        "action": {
+                            "type": "Allow"
+                        },
+                        "name": "AllowUbuntuVmRequired",
+                        "priority": 200,
+                        "rules": [
+                            {
+                                "name": "AllowNtp",
+                                "ipProtocols": [
+                                    "TCP"
+                                ],
+                                "destinationPorts": [
+                                    "123"
+                                ],
+                                "sourceAddresses": [
+                                    "[parameters('cloudAddressSpace')]"
+                                ],
+                                "sourceIpGroups": [],
+                                "destinationIpGroups": [],
+                                "destinationAddresses": [],
+                                "ruleConditionType": "NetworkRuleCondition",
+                                "ruleType": "NetworkRule",
+                                "destinationFqdns": [
+                                    "ntp.ubuntu.com"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "AllowOnPremisesRemote",
+                        "priority": 300,
+                        "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                        "action": {
+                            "type": "Allow"
+                        },
+                        "rules": [
+                            {
+                                "name": "AllowOnPremRemoteAccess",
+                                "ipProtocols": [
+                                    "TCP"
+                                ],
+                                "destinationPorts": [
+                                    "22",
+                                    "3389"
+                                ],
+                                "sourceAddresses": [
+                                    "[parameters('onPremisesAddressSpace')]"
+                                ],
+                                "sourceIpGroups": [],
+                                "destinationIpGroups": [],
+                                "destinationAddresses": [
+                                    "[parameters('cloudAddressSpace')]"
+                                ],
+                                "ruleConditionType": "NetworkRuleCondition",
+                                "ruleType": "NetworkRule"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "AllowDevVmWorkload",
+                        "priority": 400,
+                        "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+                        "action": {
+                            "type": "Allow"
+                        },
+                        "rules": [
+                            {
+                                "name": "AllowDevVmToWorkloadVnet",
+                                "ipProtocols": [
+                                    "Any"
+                                ],
+                                "destinationPorts": [
+                                    "*"
+                                ],
+                                "sourceAddresses": [
+                                    "[parameters('sharedSubnetCidr')]"
+                                ],
+                                "sourceIpGroups": [],
+                                "destinationIpGroups": [],
+                                "destinationAddresses": [
+                                    "[parameters('workloadVnetCidr')]"
+                                ],
+                                "ruleConditionType": "NetworkRuleCondition",
+                                "ruleType": "NetworkRule"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('firewallPublicIpName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "sku": {
+                "name": "Standard",
+                "tier": "Regional"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static",
+                "publicIPAddressVersion": "IPv4"
+            },
+            "zones": "[variables('firewallAz')]"
+        },
+        {
+            "type": "Microsoft.Network/azureFirewalls",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('firewallName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "zones": "[variables('firewallAz')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIpAddresses', variables('firewallPublicIpName'))]",
+                "[resourceId('Microsoft.Network/firewallPolicies', variables('fwPolicyName'))]"
+            ],
+            "properties": {
+                "firewallPolicy": {
+                    "id": "[resourceId('Microsoft.Network/firewallPolicies', variables('fwPolicyName'))]"
+                },
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('firewallPublicIpName'))]"
+                            },
+                            "subnet": {
+                                "id": "[parameters('fwPayloadSubnetId')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[concat(variables('firewallName'),'/microsoft.insights/diag')]",
+            "type": "Microsoft.Network/azureFirewalls/providers/diagnosticSettings",
+            "apiVersion": "2017-05-01-preview",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/azureFirewalls',variables('firewallName'))]"
+            ],
+            "properties": {
+                "name": "SendToWorkspace",
+                "workspaceId": "[parameters('lawResourceId')]",
+                "logs": [
+                    {
+                        "category": "AzureFirewallApplicationRule",
+                        "enabled": true
+                    },
+                    {
+                        "category": "AzureFirewallNetworkRule",
+                        "enabled": true
+                    },
+                    {
+                        "category": "AzureFirewallDnsProxy",
+                        "enabled": true
+                    }
+                ],
+                "metrics": [
+                    {
+                        "category": "AllMetrics",
+                        "enabled": true
+                    }
+                ]
+            },
+            "resources": [
+            ]
+        }
+    ],
+    "outputs": {
+    }
+}

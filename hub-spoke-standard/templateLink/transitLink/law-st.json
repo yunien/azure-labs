@@ -1,0 +1,134 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "storageName": "[concat('stlogs',parameters('location'))]",
+        "laWorkspaceName": "[concat('law-', parameters('makeSuffix'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2021-09-01",
+            "name": "[variables('storageName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "sku": {
+                "name": "Standard_RAGRS"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Deny"
+                },
+                "supportsHttpsTrafficOnly": true
+            }
+        },
+        {
+            "type": "Microsoft.OperationalInsights/workspaces",
+            "apiVersion": "2021-06-01",
+            "name": "[variables('laWorkspaceName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "publicNetworkAccessForIngestion": "Enabled",
+                "publicNetworkAccessForQuery": "Enabled",
+                "retentionInDays": 30,
+                "sku": {
+                    "name": "PerGB2018"
+                },
+                "workspaceCapping": {
+                    "dailyQuotaGb": 1
+                }
+            }
+        },
+        {
+            "name": "[concat('SecurityInsights','(', variables('laWorkspaceName'),')')]",
+            "type": "Microsoft.OperationsManagement/solutions",
+            "apiVersion": "2015-11-01-preview",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces/', variables('laWorkspaceName'))]"
+            ],
+            "properties": {
+                "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('laWorkspaceName'))]"
+            },
+            "plan": {
+                "name": "[concat('SecurityInsights','(', variables('laWorkspaceName'),')')]",
+                "product": "OMSGallery/SecurityInsights",
+                "publisher": "Microsoft",
+                "promotionCode": ""
+            }
+            // },
+            // {
+            //     "condition": "[not(empty(parameters('enableDataConnectorsKind')))]",
+            //     "name": "enableDataConnectorsKind",
+            //     "type": "Microsoft.Resources/deployments",
+            //     "apiVersion": "2019-05-01",
+            //     "dependsOn": [
+            //         "[resourceId('Microsoft.OperationsManagement/solutions/', concat('SecurityInsights','(', variables('laWorkspaceName'),')'))]"
+            //     ],
+            //     "properties": {
+            //         "mode": "Incremental",
+            //         "templateLink": {
+            //             "uri": "[uri(parameters('_artifactsLocation'), concat('ARMTemplates/LinkedTemplates/dataConnectors.json', parameters('_artifactsLocationSasToken')))]",
+            //             "contentVersion": "1.0.0.0"
+            //         },
+            //         "parameters": {
+            //             "dataConnectorsKind": {
+            //                 "value": "[parameters('enableDataConnectorsKind')]"
+            //             },
+            //             "workspaceName": {
+            //                 "value": "[variables('laWorkspaceName')]"
+            //             },
+            //             "tenantId": {
+            //                 "value": "[subscription().tenantId]"
+            //             },
+            //             "subscriptionId": {
+            //                 "value": "[subscription().subscriptionId]"
+            //             },
+            //             "securityCollectionTier": {
+            //                 "value": "[parameters('securityCollectionTier')]"
+            //             },
+            //             "mcasDiscoveryLogs": {
+            //                 "value": "[parameters('mcasDiscoveryLogs')]"
+            //             },
+            //             "location": {
+            //                 "value": "[variables('location')]"
+            //             }
+            //         }
+            //     }
+        }
+    ],
+    "outputs": {
+        "logAnalyticsName": {
+            "type": "string",
+            "value": "[variables('laWorkspaceName')]"
+        },
+        "logAnalyticsResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('laWorkspaceName'))]"
+        },
+        "logAnalyticsWorkspaceId": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces',variables('laWorkspaceName')),'2021-06-01').customerId]"
+        },
+        "storageResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Storage/storageAccounts',variables('storageName'))]"
+        }
+    }
+}

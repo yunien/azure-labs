@@ -1,0 +1,170 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        },
+        "adminObjectId": {
+            "type": "string"
+        },
+        "lawResourceId": {
+            "type": "string"
+        },
+        "vmAdminUsername": {
+            "type": "string"
+        },
+        "vmAdminPassword": {
+            "type": "securestring"
+        }
+    },
+    "variables": {
+        "keyVaultName": "[concat('kv-', parameters('makeSuffix'))]",
+        "keyPermissions": [
+            "list",
+            "encrypt",
+            "decrypt",
+            "wrapKey",
+            "unwrapKey",
+            "sign",
+            "verify",
+            "get",
+            "create",
+            "update",
+            "import",
+            "backup",
+            "restore",
+            "recover"
+        ],
+        "secretsPermissions": [
+            "list",
+            "get",
+            "set",
+            "backup",
+            "restore",
+            "recover"
+        ],
+        "certPermissions": [
+            "backup",
+            "create",
+            "get",
+            "getissuers",
+            "import",
+            "list",
+            "listissuers",
+            "managecontacts",
+            "manageissuers",
+            "recover",
+            "restore",
+            "setissuers",
+            "update"
+        ],
+        "defaultAction": "Allow",
+        "keyVaultSku": "Standard",
+        "softDeleteRetentionDays": 90,
+        "userNameSecretName": "adminusername",
+        "userPasswordSecretName": "adminpassword"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.KeyVault/vaults",
+            "apiVersion": "2021-10-01",
+            "name": "[variables('keyVaultName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "accessPolicies": [
+                    {
+                        "objectId": "[parameters('adminObjectId')]",
+                        "tenantId": "[subscription().tenantId]",
+                        "permissions": {
+                            "keys": "[variables('keyPermissions')]",
+                            "secrets": "[variables('secretsPermissions')]",
+                            "certificates": "[variables('certPermissions')]"
+                        }
+                    }
+                ],
+                "enabledForTemplateDeployment": true,
+                "enablePurgeProtection": true,
+                "enableSoftDelete": true,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "defaultAction": "[variables('defaultAction')]",
+                    "ipRules": [],
+                    "virtualNetworkRules": []
+                },
+                "publicNetworkAccess": "string",
+                "sku": {
+                    "family": "A",
+                    "name": "[variables('keyVaultSku')]"
+                },
+                "softDeleteRetentionInDays": "[variables('softDeleteRetentionDays')]",
+                "tenantId": "[subscription().tenantId]"
+            }
+        },
+        {
+            "name": "[concat(variables('keyVaultName'),'/microsoft.insights/diag')]",
+            "type": "Microsoft.KeyVault/vaults/providers/diagnosticSettings",
+            "apiVersion": "2017-05-01-preview",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults',variables('keyVaultName'))]"
+            ],
+            "properties": {
+                "name": "SendToWorkspace",
+                "workspaceId": "[parameters('lawResourceId')]",
+                "logs": [
+                    {
+                        "category": "AuditEvent",
+                        "enabled": true
+                    }
+                ],
+                "metrics": [
+                    {
+                        "category": "AllMetrics",
+                        "enabled": true
+                    }
+                ]
+            },
+            "resources": [
+            ]
+        },
+        {
+            "name": "[concat(variables('keyVaultName'),'/',variables('userNameSecretName'))]",
+            "type": "Microsoft.KeyVault/vaults/secrets",
+            "apiVersion": "2021-10-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "value": "[parameters('vmAdminUsername')]"
+            }
+        },
+        {
+            "name": "[concat(variables('keyVaultName'),'/',variables('userPasswordSecretName'))]",
+            "type": "Microsoft.KeyVault/vaults/secrets",
+            "apiVersion": "2021-10-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "value": "[parameters('vmAdminPassword')]"
+            }
+        }
+    ],
+    "outputs": {
+        "keyVaultName": {
+            "type": "string",
+            "value": "[variables('keyVaultName')]"
+        },
+        "keyVaultResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+        }
+    }
+}

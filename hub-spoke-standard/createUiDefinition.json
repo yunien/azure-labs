@@ -33,12 +33,25 @@
                     "validationMessage": "suffix are allowed, and the value must be 1-8 characters long."
                 },
                 "visible": true
+            },
+            {
+                "name": "networkWatcherRg",
+                "type": "Microsoft.Common.TextBox",
+                "label": "network watcher resource group",
+                "defaultValue": "NetworkWatcherRG",
+                "toolTip": "The suffix name should include 0-8 letters or digits.",
+                "constraints": {
+                    "required": true,
+                    "regex": "^[A-Za-z0-9-]+$",
+                    "validationMessage": "NetworkWatcher resource group name."
+                },
+                "visible": true
             }
         ],
         "steps": [
             {
-                "name": "transitVnet",
-                "label": "transit Vnet",
+                "name": "transit",
+                "label": "services in transit rg",
                 "elements": [
                     {
                         "name": "transitVnetCidr",
@@ -49,78 +62,93 @@
                         "constraints": {
                             "required": true,
                             "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
-                            "validationMessage": "should be location"
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
                         },
                         "visible": true
                     },
                     {
                         "name": "transitGatewaySubnetCidr",
                         "type": "Microsoft.Common.TextBox",
-                        "label": "transit Vnet Cidr",
+                        "label": "transit gateway subnet Cidr",
                         "defaultValue": "10.0.0.0/27",
-                        "toolTip": "transit Vnet Cidr",
+                        "toolTip": "transit gateway subnet Cidr",
                         "constraints": {
                             "required": true,
                             "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
-                            "validationMessage": "should be location"
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
                         },
                         "visible": true
                     },
                     {
                         "name": "transitBastionSubnetCidr",
                         "type": "Microsoft.Common.TextBox",
-                        "label": "transit Vnet Cidr",
+                        "label": "transit bastion subnet Cidr",
                         "defaultValue": "10.0.1.0/26",
-                        "toolTip": "transit Vnet Cidr",
+                        "toolTip": "transit bastion subnet Cidr",
                         "constraints": {
                             "required": true,
                             "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/26",
-                            "validationMessage": "should be location"
+                            "validationMessage": "should be xx.xx.xx.xx/26"
                         },
                         "visible": true
                     },
                     {
                         "name": "transitFwSubnetCidr",
                         "type": "Microsoft.Common.TextBox",
-                        "label": "transit Vnet Cidr",
+                        "label": "transit firewall subnet Cidr",
                         "defaultValue": "10.0.2.0/26",
-                        "toolTip": "transit Vnet Cidr",
+                        "toolTip": "transit firewall subnet Cidr",
                         "constraints": {
                             "required": true,
                             "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
-                            "validationMessage": "should be location"
-                        },
-                        "visible": true
-                    },
-                    {
-                        "name": "transitRegion",
-                        "type": "Microsoft.Common.TextBox",
-                        "label": "transit region",
-                        "defaultValue": "eastus",
-                        "toolTip": "default is resource group location",
-                        "constraints": {
-                            "required": true,
-                            "regex": "^[A-Za-z0-9 ]+$",
-                            "validationMessage": "should be location"
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
                         },
                         "visible": true
                     }
                 ]
             },
             {
-                "name": "sharedVnet",
-                "label": "shared Vnet",
+                "name": "shared",
+                "label": "services in shared rg",
                 "elements": [
                     {
-                        "name": "sharedRegion",
+                        "name": "adminObjectId",
                         "type": "Microsoft.Common.TextBox",
-                        "label": "shared region",
-                        "defaultValue": "eastus",
-                        "toolTip": "default is resource group location",
+                        "label": "admin Object Id",
+                        "toolTip": "The object ID of the user or group. Object Id in AAD",
+                        "defaultValue": "50bc59ae-70d3-4cc3-8541-7bd5a1237212",
                         "constraints": {
                             "required": true,
-                            "regex": "^[A-Za-z0-9 ]+$",
-                            "validationMessage": "should be location"
+                            "regex": "^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$",
+                            "validationMessage": "should be Object Id in AAD"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "vmAdminUsername",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "vm Admin User Name",
+                        "toolTip": "vm user name in shared rg",
+                        "defaultValue": "",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[A-Za-z0-9]+$",
+                            "validationMessage": "keyin user name"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "vmAdminPassword",
+                        "type": "Microsoft.Common.PasswordBox",
+                        "label": {
+                            "password": "vm user Password",
+                            "confirmPassword": "Confirm vm user password"
+                        },
+                        "toolTip": "vm user password in shared rg",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[a-zA-Z0-9]{8,}$",
+                            "validationMessage": "Password must be at least 8 characters long, contain only numbers and letters"
                         },
                         "visible": true
                     }
@@ -149,12 +177,14 @@
         "outputs": {
             "envName": "[basics('envName')]",
             "suffix": "[basics('suffix')]",
-            "transitVnetCidr": "[steps('transitVnet').transitVnetCidr]",
-            "transitGatewaySubnetCidr": "[steps('transitVnet').transitGatewaySubnetCidr]",
-            "transitBastionSubnetCidr": "[steps('transitVnet').transitBastionSubnetCidr]",
-            "transitFwSubnetCidr": "[steps('transitVnet').transitFwSubnetCidr]",
-            "transitRegion": "[steps('transitVnet').transitRegion]",
-            "sharedRegion": "[steps('sharedVnet').sharedRegion]",
+            "networkWatcherRg": "[basics('networkWatcherRg')]",
+            "transitVnetCidr": "[steps('transit').transitVnetCidr]",
+            "transitGatewaySubnetCidr": "[steps('transit').transitGatewaySubnetCidr]",
+            "transitBastionSubnetCidr": "[steps('transit').transitBastionSubnetCidr]",
+            "transitFwSubnetCidr": "[steps('transit').transitFwSubnetCidr]",
+            "adminObjectId": "[steps('shared').adminObjectId]",
+            "vmAdminUsername": "[steps('shared').vmAdminUsername]",
+            "vmAdminPassword": "[steps('shared').vmAdminPassword]",
             "workloadRegion": "[steps('workloadVnet').workloadRegion]",
             "location": "[location()]"
         }
