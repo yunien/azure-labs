@@ -25,16 +25,19 @@
         }
     },
     "variables": {
-        "transitVnettName": "[concat('vnet-transit-', parameters('makeSuffix'))]",
+        "transitVnetName": "[concat('vnet-transit-', parameters('makeSuffix'))]",
         "gatewaySubnetName": "GatewaySubnet",
         "bastionSubnetName": "AzureBastionSubnet",
-        "fwPayloadSubnetName": "AzureFirewallSubnet"
+        "fwPayloadSubnetName": "AzureFirewallSubnet",
+        "bastionPublicIpName": "[concat('pip-bst-', parameters('makeSuffix'))]",
+        "bastionName": "[concat('bst-', parameters('makeSuffix'))]",
+        "bastionSku": "Basic" // Basic or Standard
     },
     "resources": [
         {
             "type": "Microsoft.Network/virtualNetworks",
             "apiVersion": "2021-08-01",
-            "name": "[variables('transitVnettName')]",
+            "name": "[variables('transitVnetName')]",
             "location": "[parameters('location')]",
             "tags": "[parameters('tags')]",
             "properties": {
@@ -48,10 +51,10 @@
         {
             "comments": "gateway subnet",
             "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnettName'), '/', variables('gatewaySubnetName'))]",
+            "name": "[concat(variables('transitVnetName'), '/', variables('gatewaySubnetName'))]",
             "apiVersion": "2021-08-01",
             "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks', variables('transitVnettName'))]"
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('transitVnetName'))]"
             ],
             "properties": {
                 "addressPrefix": "[parameters('transitGatewaySubnetCidr')]"
@@ -59,10 +62,10 @@
         },
         {
             "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnettName'), '/', variables('bastionSubnetName'))]",
+            "name": "[concat(variables('transitVnetName'), '/', variables('bastionSubnetName'))]",
             "apiVersion": "2021-08-01",
             "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnettName'), variables('gatewaySubnetName'))]"
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('gatewaySubnetName'))]"
             ],
             "properties": {
                 "addressPrefix": "[parameters('transitBastionSubnetCidr')]"
@@ -70,13 +73,56 @@
         },
         {
             "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnettName'), '/', variables('fwPayloadSubnetName'))]",
+            "name": "[concat(variables('transitVnetName'), '/', variables('fwPayloadSubnetName'))]",
             "apiVersion": "2021-08-01",
             "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnettName'), variables('bastionSubnetName'))]"
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('bastionSubnetName'))]"
             ],
             "properties": {
                 "addressPrefix": "[parameters('transitFwSubnetCidr')]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('bastionPublicIpName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static"
+            }
+        },
+        {
+            "type": "Microsoft.Network/bastionHosts",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('bastionName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "sku": {
+                "name": "[variables('bastionSku')]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIpAddresses', variables('bastionPublicIpName'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('transitVnetName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "bastionConfig",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('bastionPublicIpName'))]"
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('bastionSubnetName'))]"
+                            }
+                        }
+                    }
+                ]
             }
         }
     ],
