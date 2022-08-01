@@ -16,16 +16,12 @@
         },
         "lawResourceId": {
             "type": "string"
-        },
-        "vmAdminUsername": {
-            "type": "string"
-        },
-        "vmAdminPassword": {
-            "type": "securestring"
         }
     },
     "variables": {
-        "keyVaultName": "[take(concat('kv-', parameters('makeSuffix')), 24)]",
+        "workloadUmi": "[concat('umi-', parameters('makeSuffix'))]",
+        //
+        "keyVaultName": "[take(concat('kv-app-', parameters('makeSuffix')), 24)]",
         "keyPermissions": [
             "list",
             "encrypt",
@@ -66,16 +62,24 @@
             "update"
         ],
         "keyVaultSku": "Standard",
-        "softDeleteRetentionDays": 90,
-        "userNameSecretName": "adminusername",
-        "userPasswordSecretName": "adminpassword"
+        "softDeleteRetentionDays": 90
     },
     "resources": [
+        {
+            "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+            "apiVersion": "2021-09-30-preview",
+            "name": "[variables('workloadUmi')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]"
+        },
         {
             "type": "Microsoft.KeyVault/vaults",
             "apiVersion": "2021-11-01-preview",
             "name": "[variables('keyVaultName')]",
             "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities',variables('workloadUmi'))]"
+            ],
             "properties": {
                 "enabledForDeployment": false,
                 "enabledForDiskEncryption": false,
@@ -98,7 +102,7 @@
                     "family": "A"
                 },
                 "networkAcls": {
-                    "defaultAction": "Allow",
+                    "defaultAction": "Deny",
                     "bypass": "AzureServices"
                 }
             }
@@ -132,26 +136,29 @@
             ]
         },
         {
-            "type": "Microsoft.KeyVault/vaults/secrets",
+            "type": "Microsoft.KeyVault/vaults/accessPolicies",
             "apiVersion": "2021-11-01-preview",
-            "name": "[concat(variables('keyVaultName'),'/',variables('userNameSecretName'))]",
-            "properties": {
-                "value": "[parameters('vmAdminUsername')]"
-            },
+            "name": "[concat(variables('keyVaultName'),'/add')]",
             "dependsOn": [
-                "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
-            ]
-        },
-        {
-            "type": "Microsoft.KeyVault/vaults/secrets",
-            "apiVersion": "2021-11-01-preview",
-            "name": "[concat(variables('keyVaultName'),'/',variables('userPasswordSecretName'))]",
+                "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities',variables('workloadUmi'))]",
+                "[resourceId('Microsoft.KeyVault/vaults',variables('keyVaultName'))]"
+            ],
             "properties": {
-                "value": "[parameters('vmAdminPassword')]"
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
-            ]
+                "accessPolicies": [
+                    {
+                        "objectId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities',variables('workloadUmi'))).principalId]",
+                        "permissions": {
+                            "certificates": [],
+                            "keys": [],
+                            "secrets": [
+                                "get",
+                                "list"
+                            ]
+                        },
+                        "tenantId": "[subscription().tenantId]"
+                    }
+                ]
+            }
         }
     ],
     "outputs": {

@@ -1,0 +1,244 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        },
+        "sharedSvcDevSubnetResourceId": {
+            "type": "string"
+        },
+        "vmAdminUsername": {
+            "type": "string"
+        },
+        "vmAdminPassword": {
+            "type": "securestring"
+        },
+        "lawWorkspaceId": {
+            "type": "string"
+        },
+        "lawWorkspaceKey": {
+            "type": "securestring"
+        }
+    },
+    "variables": {
+        "vmName": "[concat('windows-vm-',parameters('makeSuffix'))]",
+        "nicName": "[concat('nic-',variables('vmName'))]",
+        "ipConfigName": "[concat('ipconfig-',variables('vmName'))]",
+        "serverIpAddress": "10.1.0.6",
+        "vmSku": "Standard_D4s_v5",
+        "osDiskType": "StandardSSD_LRS",
+        "scriptName": "prepare_windows_dev_vm.ps1",
+        "scriptUrl": "[uri(deployment().properties.templateLink.uri, concat('scripts/',variables('scriptName')))]",
+        "modulesUrl": "[uri(deployment().properties.templateLink.uri, 'dsc/windowsdevvm.zip')]",
+        "configurationFunction": "windowsdevvm.ps1\\WindowsDevVM"
+    },
+    "resources": [
+        {
+            "name": "[variables('nicName')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2021-08-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "[variables('ipConfigName')]",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[variables('serverIpAddress')]",
+                            "subnet": {
+                                "id": "[parameters('sharedSvcDevSubnetResourceId')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[variables('vmName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2022-03-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', variables('nicName'))]"
+            ],
+            "properties": {
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                },
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSku')]"
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[take(variables('vmName'),15)]",
+                    "adminUsername": "[parameters('vmAdminUsername')]",
+                    "adminPassword": "[parameters('vmAdminPassword')]",
+                    "windowsConfiguration": {
+                        "enableAutomaticUpdates": true,
+                        "provisionVmAgent": true
+                    }
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "createOption": "fromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[variables('osDiskType')]"
+                        }
+                    },
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2019-Datacenter",
+                        "version": "latest"
+                    }
+                }
+            },
+            "resources": [
+                {
+                    "type": "extensions",
+                    "name": "DependencyAgentWindows",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'))]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Azure.Monitoring.DependencyAgent",
+                        "type": "DependencyAgentWindows",
+                        "typeHandlerVersion": "9.5",
+                        "autoUpgradeMinorVersion": true
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "MMAExtension",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'))]",
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/DependencyAgentWindows')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.EnterpriseCloud.Monitoring",
+                        "type": "MicrosoftMonitoringAgent",
+                        "typeHandlerVersion": "1.0",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "workspaceId": "[parameters('lawWorkspaceId')]",
+                            "stopOnMultipleConnections": true
+                        },
+                        "protectedSettings": {
+                            "workspaceKey": "[parameters('lawWorkspaceKey')]"
+                        }
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "AzureMonitorWindowsAgent",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'))]",
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/MMAExtension')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Azure.Monitor",
+                        "type": "AzureMonitorWindowsAgent",
+                        "typeHandlerVersion": "1.0",
+                        "autoUpgradeMinorVersion": true,
+                        "enableAutomaticUpgrade": true
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "Microsoft.Azure.NetworkWatcher",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'))]",
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/AzureMonitorWindowsAgent')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Azure.NetworkWatcher",
+                        "type": "NetworkWatcherAgentWindows",
+                        "typeHandlerVersion": "1.4",
+                        "autoUpgradeMinorVersion": true
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "CreateDevServer",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines', variables('vmName'))]",
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/Microsoft.Azure.NetworkWatcher')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Powershell",
+                        "type": "DSC",
+                        "typeHandlerVersion": "2.77",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "ModulesUrl": "[variables('modulesUrl')]",
+                            "ConfigurationFunction": "[variables('configurationFunction')]",
+                            "Properties": {
+                                "MachineName": "[variables('vmName')]",
+                                "AdminCreds": {
+                                    "UserName": "[parameters('vmAdminUsername')]",
+                                    "Password": "PrivateSettingsRef:AdminPassword"
+                                }
+                            }
+                        },
+                        "protectedSettings": {
+                            "Items": {
+                                "AdminPassword": "[parameters('vmAdminPassword')]"
+                            }
+                        }
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "CustomScriptExtension",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'))]",   
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/CreateDevServer')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Compute",
+                        "type": "CustomScriptExtension",
+                        "typeHandlerVersion": "1.10",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "fileUris": [
+                                "[variables('scriptUrl')]"
+                            ]
+                        },
+                        "protectedSettings": {
+                            "commandToExecute": "[concat('powershell.exe -Command \"./', variables('scriptName'), '; exit 0;\"')]"
+                        }   
+                    }
+                }
+            ]
+        }
+    ]
+}

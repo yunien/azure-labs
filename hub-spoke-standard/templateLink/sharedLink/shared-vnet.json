@@ -1,0 +1,196 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        },
+        "firewallIp": {
+            "type": "string"
+        },
+        "sharedSvcVnetCidr": {
+            "type": "string"
+        },
+        "sharedSubnetCidr": {
+            "type": "string"
+        },
+        "sharedSvcVnetSubnetPeCidr": {
+            "type": "string"
+        },
+        "transitVnetResourceId": {
+            "type": "string"
+        },
+        "transitVnetName": {
+            "type": "string"
+        },
+        "transitRG": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "nsgName": "[concat('nsg-shared-',parameters('makeSuffix'))]",
+        "nsgPeName": "[concat('nsg-pe-shared-',parameters('makeSuffix'))]",
+        "svcRouteTableName": "[concat('rt-shared-', parameters('makeSuffix'))]",
+        "sharedVnetName": "[concat('vnet-shared-', parameters('makeSuffix'))]",
+        "sharedSvcDevSubnetName": "[concat('sub-snet-', parameters('makeSuffix'))]",
+        "sharedSvcPeSvcSubnetName": "[concat('sub-snet-pe-', parameters('makeSuffix'))]",
+        "peeringSharedToTransit": "peersharedtotransit",
+        "peeringTransitToShared": "peertransittoshared"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('nsgName')]",
+            "apiVersion": "2021-08-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]"
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('nsgPeName')]",
+            "apiVersion": "2021-08-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]"
+        },
+        {
+            "type": "Microsoft.Network/routeTables",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('svcRouteTableName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "disableBgpRoutePropagation": true,
+                "routes": [
+                    {
+                        "name": "udr-default",
+                        "properties": {
+                            "addressPrefix": "0.0.0.0/0",
+                            "hasBgpOverride": false,
+                            "nextHopIpAddress": "[parameters('firewallIp')]",
+                            "nextHopType": "VirtualAppliance"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('sharedVnetName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/routeTables',variables('svcRouteTableName'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [ "[parameters('sharedSvcVnetCidr')]" ]
+                },
+                "enableDdosProtection": false,
+                "enableVmProtection": false,
+                "subnets": [
+                    {
+                        "name": "[variables('sharedSvcDevSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('sharedSubnetCidr')]",
+                            "routeTable": {
+                                "id": "[resourceId('Microsoft.Network/routeTables',variables('svcRouteTableName'))]"
+                            },
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[variables('sharedSvcPeSvcSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('sharedSvcVnetSubnetPeCidr')]",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgPeName'))]"
+                            },
+                            "privateEndpointNetworkPolicies": "Disabled"
+                        }
+                    }
+                ]
+            },
+            "resources": [
+                {
+                    "name": "[variables('peeringSharedToTransit')]",
+                    "type": "virtualNetworkPeerings",
+                    "apiVersion": "2021-08-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Network/virtualNetworks',variables('sharedVnetName'))]"
+                    ],
+                    "properties": {
+                        "allowVirtualNetworkAccess": true,
+                        "allowForwardedTraffic": true,
+                        "allowGatewayTransit": false,
+                        "useRemoteGateways": false,
+                        "remoteVirtualNetwork": {
+                            "id": "[parameters('transitVnetResourceId')]"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('peeringTransitToShared')]",
+            "resourceGroup": "[parameters('transitRG')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks',variables('sharedVnetName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "variables": {},
+                    "resources": [
+                        {
+                            "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+                            "apiVersion": "2021-08-01",
+                            "name": "[concat(parameters('transitVnetName'), '/', variables('peeringTransitToShared'))]",
+                            "properties": {
+                                "allowForwardedTraffic": true,
+                                "allowGatewayTransit": true,
+                                "allowVirtualNetworkAccess": true,
+                                "remoteVirtualNetwork": {
+                                    "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('sharedVnetName'))]"
+                                },
+                                "useRemoteGateways": false
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "sharedVnetResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/virtualNetworks',variables('sharedVnetName'))]"
+        },
+        "sharedSvcDevSubnetResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets',variables('sharedVnetName'),variables('sharedSvcDevSubnetName'))]"
+        },
+        "nsgName": {
+            "type": "string",
+            "value": "[variables('nsgName')]"
+        },
+        "nsgResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('nsgName'))]"
+        }
+    }
+}

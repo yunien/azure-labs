@@ -23,9 +23,6 @@
         "makeSuffix": {
             "type": "string"
         },
-        "networkWatcherRg": {
-            "type": "string"
-        },
         "transitVnetCidr": {
             "type": "string"
         },
@@ -40,7 +37,6 @@
         }
     },
     "variables": {
-        "bastionNsgName": "[concat('nsg-bst-', parameters('makeSuffix'))]",
         "deployVnet": "[concat('deploy-vnet-transit-', parameters('makeSuffix'))]",
         "deployVnetTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/transit-vnet.json')]",
         "deploylawandst": "[concat('deploy-law-st-', parameters('makeSuffix'))]",
@@ -48,9 +44,7 @@
         "deployBastion": "[concat('deploy-bastion-', parameters('makeSuffix'))]",
         "deployBastionTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/bastion.json')]",
         "deployFirewall": "[concat('deploy-fw-', parameters('makeSuffix'))]",
-        "deployFirewallTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/firewall.json')]",
-        "deployFlowLogs": "[concat('deploy-flow-logs-', parameters('makeSuffix'))]",
-        "deployFlowLogsTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/flow-logs.json')]"
+        "deployFirewallTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'transitLink/firewall.json')]"
     },
     "resources": [
         {
@@ -92,9 +86,6 @@
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2021-04-01",
             "name": "[variables('deploylawandst')]",
-            "dependsOn": [
-                "[resourceId('Microsoft.Resources/deployments/', variables('deployVnet'))]"
-            ],
             "properties": {
                 "mode": "Incremental",
                 "templateLink": {
@@ -119,7 +110,8 @@
             "apiVersion": "2021-04-01",
             "name": "[variables('deployBastion')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Resources/deployments/', variables('deployVnet'))]"
+                "[resourceId('Microsoft.Resources/deployments/', variables('deployVnet'))]",
+                "[resourceId('Microsoft.Resources/deployments',variables('deploylawandst'))]"
             ],
             "properties": {
                 "mode": "Incremental",
@@ -133,9 +125,6 @@
                     },
                     "lawResourceId": {
                         "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsResourceId.value]"
-                    },
-                    "bastionNsgName": {
-                        "value": "[variables('bastionNsgName')]"
                     },
                     "tags": {
                         "value": "[parameters('tags')]"
@@ -193,49 +182,44 @@
                     }
                 }
             }
-        },
-        {
-            "type": "Microsoft.Resources/deployments",
-            "apiVersion": "2021-04-01",
-            "name": "[variables('deployFlowLogs')]",
-            "resourceGroup": "[parameters('networkWatcherRg')]",
-            "dependsOn": [
-                "[resourceId('Microsoft.Resources/deployments/', variables('deployVnet'))]",
-                "[resourceId('Microsoft.Resources/deployments',variables('deploylawandst'))]"
-            ],
-            "properties": {
-                "mode": "Incremental",
-                "templateLink": {
-                    "uri": "[variables('deployFlowLogsTemplateUrl')]",
-                    "contentVersion": "1.0.0.0"
-                },
-                "parameters": {
-                    "tags": {
-                        "value": "[parameters('tags')]"
-                    },
-                    "location": {
-                        "value": "[parameters('location')]"
-                    },
-                    "lawResourceId": {
-                        "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsResourceId.value]"
-                    },
-                    "stResourceId": {
-                        "value": "[reference(variables('deploylawandst')).outputs.storageResourceId.value]"
-                    },
-                    "bastionNsgResourceId": {
-                        "value": "[reference(variables('deployBastion')).outputs.nsgResourceId.value]"
-                    },
-                    "bastionNsgName": {
-                        "value": "[variables('bastionNsgName')]"
-                    }
-                }
-            }
         }
     ],
     "outputs": {
         "lawResourceId": {
             "type": "string",
             "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsResourceId.value]"
+        },
+        "lawWorkspaceId": {
+            "type": "string",
+            "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsWorkspaceId.value]"
+        },
+        "lawWorkspaceKey": {
+            "type": "string",
+            "value": "[reference(variables('deploylawandst')).outputs.logAnalyticsWorkspaceKey.value]"
+        },
+        "firewallIp": {
+            "type": "string",
+            "value": "[reference(variables('deployFirewall')).outputs.firewallIp.value]"
+        },
+        "transitVnetResourceId": {
+            "type": "string",
+            "value": "[reference(variables('deployVnet')).outputs.transitVnetResourceId.value]"
+        },
+        "transitVnetName": {
+            "type": "string",
+            "value": "[reference(variables('deployVnet')).outputs.transitVnetName.value]"
+        },
+        "stResourceId": {
+            "type": "string",
+            "value": "[reference(variables('deploylawandst')).outputs.storageResourceId.value]"
+        },
+        "bastionNsgResourceId": {
+            "type": "string",
+            "value": "[reference(variables('deployVnet')).outputs.bastionNsgResourceId.value]"
+        },
+        "bastionNsgName": {
+            "type": "string",
+            "value": "[reference(variables('deployVnet')).outputs.bastionNsgName.value]"
         }
     }
 }

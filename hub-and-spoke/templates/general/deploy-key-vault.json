@@ -135,6 +135,7 @@
                     ],
                     "defaultAction": "[parameters('defaultAction')]"
                 },
+                "publicNetworkAccess": "Disabled",
                 "sku": {
                     "family": "A",
                     "name": "[variables('keyVaultSku')]"

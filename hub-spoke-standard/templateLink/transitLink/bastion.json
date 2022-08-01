@@ -8,9 +8,6 @@
         "lawResourceId": {
             "type": "string"
         },
-        "bastionNsgName": {
-            "type": "string"
-        },
         "tags": {
             "type": "object"
         },
@@ -39,154 +36,6 @@
             },
             "properties": {
                 "publicIPAllocationMethod": "Static"
-            }
-        },
-        {
-            "type": "Microsoft.Network/networkSecurityGroups",
-            "apiVersion": "2021-08-01",
-            "name": "[parameters('bastionNsgName')]",
-            "location": "[parameters('location')]",
-            "tags": "[parameters('tags')]",
-            "properties": {
-                "securityRules": [
-                    {
-                        "name": "AllowHttps",
-                        "properties": {
-                            "priority": 100,
-                            "access": "Allow",
-                            "description": "Allow incoming HTTPS traffic from Internet",
-                            "protocol": "Tcp",
-                            "sourcePortRange": "*",
-                            "destinationPortRange": "443",
-                            "sourceAddressPrefix": "Internet",
-                            "destinationAddressPrefix": "*",
-                            "direction": "Inbound"
-                        }
-                    },
-                    {
-                        "name": "AllowControlPlane",
-                        "properties": {
-                            "priority": 101,
-                            "access": "Allow",
-                            "description": "Allow control plane traffic",
-                            "protocol": "Tcp",
-                            "sourcePortRange": "*",
-                            "destinationPortRanges": [
-                                "443"
-                            ],
-                            "sourceAddressPrefix": "GatewayManager",
-                            "destinationAddressPrefix": "*",
-                            "direction": "Inbound"
-                        }
-                    },
-                    {
-                        "name": "AllowDataPlane",
-                        "properties": {
-                            "priority": 102,
-                            "access": "Allow",
-                            "description": "Allows Azure Bastion data plane traffic",
-                            "protocol": "*",
-                            "sourcePortRange": "*",
-                            "destinationPortRanges": [
-                                "8080",
-                                "5701"
-                            ],
-                            "sourceAddressPrefix": "VirtualNetwork",
-                            "destinationAddressPrefix": "VirtualNetwork",
-                            "direction": "Inbound"
-                        }
-                    },
-                    {
-                        "name": "AllowHealthProbes",
-                        "properties": {
-                            "priority": 103,
-                            "access": "Allow",
-                            "description": "Allows health probes from Azure Load Balancer",
-                            "protocol": "Tcp",
-                            "sourcePortRange": "*",
-                            "destinationPortRange": "443",
-                            "sourceAddressPrefix": "AzureLoadBalancer",
-                            "destinationAddressPrefix": "*",
-                            "direction": "Inbound"
-                        }
-                    },
-                    {
-                        "name": "DenyAllInbound",
-                        "properties": {
-                            "priority": 1000,
-                            "access": "Deny",
-                            "description": "Deny all inbound traffic",
-                            "protocol": "*",
-                            "sourcePortRange": "*",
-                            "destinationPortRange": "*",
-                            "sourceAddressPrefix": "*",
-                            "destinationAddressPrefix": "*",
-                            "direction": "Inbound"
-                        }
-                    },
-                    {
-                        "name": "AllowOutboundDataPlane",
-                        "properties": {
-                            "priority": 100,
-                            "access": "Allow",
-                            "description": "Allows Azure Bastion data plane traffic",
-                            "protocol": "*",
-                            "sourcePortRange": "*",
-                            "destinationPortRanges": [
-                                "8080",
-                                "5701"
-                            ],
-                            "sourceAddressPrefix": "*",
-                            "destinationAddressPrefix": "AzureCloud",
-                            "direction": "Outbound"
-                        }
-                    },
-                    {
-                        "name": "AllowOutboundAzureCloud",
-                        "properties": {
-                            "priority": 101,
-                            "access": "Allow",
-                            "description": "Allows Bastion hosts to communicate with management components",
-                            "protocol": "Tcp",
-                            "sourcePortRange": "*",
-                            "destinationPortRange": "443",
-                            "sourceAddressPrefix": "*",
-                            "destinationAddressPrefix": "AzureCloud",
-                            "direction": "Outbound"
-                        }
-                    },
-                    {
-                        "name": "AllowOutboundInternet",
-                        "properties": {
-                            "priority": 102,
-                            "access": "Allow",
-                            "description": "Allows Bastion to validate certificates",
-                            "protocol": "*",
-                            "sourcePortRange": "*",
-                            "destinationPortRange": "80",
-                            "sourceAddressPrefix": "*",
-                            "destinationAddressPrefix": "*",
-                            "direction": "Outbound"
-                        }
-                    },
-                    {
-                        "name": "AllowOutboundVirtualNetwork",
-                        "properties": {
-                            "priority": 103,
-                            "access": "Allow",
-                            "description": "Allows Bastion to connect to VMs over SSH and RDP",
-                            "protocol": "*",
-                            "sourcePortRange": "*",
-                            "destinationPortRanges": [
-                                "3389",
-                                "22"
-                            ],
-                            "sourceAddressPrefix": "*",
-                            "destinationAddressPrefix": "VirtualNetwork",
-                            "direction": "Outbound"
-                        }
-                    }
-                ]
             }
         },
         {
@@ -243,10 +92,5 @@
             ]
         }
     ],
-    "outputs": {
-        "nsgResourceId": {
-            "type": "string",
-            "value": "[resourceId('Microsoft.Network/networkSecurityGroups',parameters('bastionNsgName'))]"
-        }
-    }
+    "outputs": {}
 }

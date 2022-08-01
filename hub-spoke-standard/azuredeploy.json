@@ -2,17 +2,12 @@
     "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "envName": {
+        "location": {
             "type": "string",
             "metadata": {
-                "description": "env"
-            }
-        },
-        "suffix": {
-            "type": "string",
-            "metadata": {
-                "description": "suffix string"
-            }
+                "description": "Location of the resource group"
+            },
+            "defaultValue": "[deployment().location]"
         },
         "tags": {
             "type": "object",
@@ -24,41 +19,16 @@
                 "creater": "electrum"
             }
         },
+        "envName": {
+            "type": "string"
+        },
+        "suffix": {
+            "type": "string"
+        },
         "networkWatcherRg": {
             "type": "string",
             "metadata": {
                 "description": "network Watcher Resource Group"
-            }
-        },
-        "location": {
-            "type": "string",
-            "metadata": {
-                "description": "Location of the resource group"
-            },
-            "defaultValue": "[deployment().location]"
-        },
-        "transitVnetCidr": {
-            "type": "string",
-            "metadata": {
-                "description": "description"
-            }
-        },
-        "transitGatewaySubnetCidr": {
-            "type": "string",
-            "metadata": {
-                "description": "description"
-            }
-        },
-        "transitBastionSubnetCidr": {
-            "type": "string",
-            "metadata": {
-                "description": "description"
-            }
-        },
-        "transitFwSubnetCidr": {
-            "type": "string",
-            "metadata": {
-                "description": "description"
             }
         },
         "adminObjectId": {
@@ -66,6 +36,78 @@
             "metadata": {
                 "description": "The object ID of the user or group who will have full permissons on Azure Key Vault"
             }
+        },
+        "onPremisesAddressSpace": {
+            "type": "string"
+        },
+        "cloudAddressSpace": {
+            "type": "string"
+        },
+        "transitVnetCidr": {
+            "type": "string"
+        },
+        "transitGatewaySubnetCidr": {
+            "type": "string"
+        },
+        "transitBastionSubnetCidr": {
+            "type": "string"
+        },
+        "transitFwSubnetCidr": {
+            "type": "string"
+        },
+        "sharedSvcVnetCidr": {
+            "type": "string"
+        },
+        "sharedSubnetCidr": {
+            "type": "string"
+        },
+        "sharedSvcVnetSubnetPeCidr": {
+            "type": "string"
+        },
+        "workloadVnetCidr": {
+            "type": "string"
+        },
+        "workloadVnetSubnetAppCidr": {
+            "type": "string"
+        },
+        "workloadVnetSubnetDataCidr": {
+            "type": "string"
+        },
+        "workloadVnetSubnetSvcCidr": {
+            "type": "string"
+        },
+        "pricingTierAppServices": {
+            "type": "string"
+        },
+        "pricingTierSqlServers": {
+            "type": "string"
+        },
+        "pricingTierSqlServerVM": {
+            "type": "string"
+        },
+        "pricingTierStorageAccounts": {
+            "type": "string"
+        },
+        "pricingTierK8s": {
+            "type": "string"
+        },
+        "pricingTierContainerRegistry": {
+            "type": "string"
+        },
+        "pricingTierKeyVaults": {
+            "type": "string"
+        },
+        "pricingTierArm": {
+            "type": "string"
+        },
+        "pricingTierDns": {
+            "type": "string"
+        },
+        "pricingTierVM": {
+            "type": "string"
+        },
+        "autoProvision": {
+            "type": "string"
         },
         "vmAdminUsername": {
             "type": "string"
@@ -76,17 +118,18 @@
     },
     "variables": {
         "makeSuffix": "[concat(parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
+        "transitRG": "[concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
+        "sharedRG": "[concat('rg-shared-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
+        "workloadRG": "[concat('rg-workload-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
         "transitDeploymentName": "[concat('deploy-transit-',variables('makeSuffix'))]",
         "transitTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'templateLink/transitdeploy.json')]",
         "sharedDeploymentName": "[concat('deploy-shared-',variables('makeSuffix'))]",
         "sharedTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'templateLink/shareddeploy.json')]",
-        //params
-        "cloudAddressSpace": "10.0.0.0/8",
-        "sharedSubnetCidr": "10.1.0.0/24",
-        "workloadVnetCidr": "10.2.0.0/16",
-        "onPremisesAddressSpace": "192.168.0.0/16",
-        "transitRG": "[concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
-        "sharedRG": "[concat('rg-shared-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]"
+        "workloadDeploymentName": "[concat('deploy-workload-',variables('makeSuffix'))]",
+        "workloadTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'templateLink/workloaddeploy.json')]",
+        "flowLogsDeploymentName": "[concat('deploy-flow-logs-', variables('makeSuffix'))]",
+        "flowLogsTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'templateLink/globalLink/flow-logs.json')]",
+        "defenderDeploymentName": "[concat('deploy-defender-plans-', variables('makeSuffix'))]"
     },
     "resources": [
         {
@@ -104,12 +147,19 @@
             "properties": {}
         },
         {
+            "type": "Microsoft.Resources/resourceGroups",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('workloadRG')]",
+            "location": "[parameters('location')]",
+            "properties": {}
+        },
+        {
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2021-04-01",
             "name": "[variables('transitDeploymentName')]",
-            "resourceGroup": "[concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
+            "resourceGroup": "[variables('transitRG')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Resources/resourceGroups', concat('rg-transit-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix')))]"
+                "[resourceId('Microsoft.Resources/resourceGroups',variables('transitRG'))]"
             ],
             "properties": {
                 "mode": "Incremental",
@@ -119,16 +169,16 @@
                 },
                 "parameters": {
                     "cloudAddressSpace": {
-                        "value": "[variables('cloudAddressSpace')]"
+                        "value": "[parameters('cloudAddressSpace')]"
                     },
                     "sharedSubnetCidr": {
-                        "value": "[variables('sharedSubnetCidr')]"
+                        "value": "[parameters('sharedSubnetCidr')]"
                     },
                     "workloadVnetCidr": {
-                        "value": "[variables('workloadVnetCidr')]"
+                        "value": "[parameters('workloadVnetCidr')]"
                     },
                     "onPremisesAddressSpace": {
-                        "value": "[variables('onPremisesAddressSpace')]"
+                        "value": "[parameters('onPremisesAddressSpace')]"
                     },
                     "tags": {
                         "value": "[parameters('tags')]"
@@ -138,9 +188,6 @@
                     },
                     "makeSuffix": {
                         "value": "[variables('makeSuffix')]"
-                    },
-                    "networkWatcherRg": {
-                        "value": "[parameters('networkWatcherRg')]"
                     },
                     "transitVnetCidr": {
                         "value": "[parameters('transitVnetCidr')]"
@@ -156,48 +203,334 @@
                     }
                 }
             }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('sharedDeploymentName')]",
+            "resourceGroup": "[variables('sharedRG')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/resourceGroups',variables('sharedRG'))]",
+                "[tenantResourceId('Microsoft.Resources/deployments',variables('transitDeploymentName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('sharedTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[variables('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "adminObjectId": {
+                        "value": "[parameters('adminObjectId')]"
+                    },
+                    "lawResourceId": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.lawResourceId.value]"
+                    },
+                    "firewallIp": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.firewallIp.value]"
+                    },
+                    "sharedSvcVnetCidr": {
+                        "value": "[parameters('sharedSvcVnetCidr')]"
+                    },
+                    "sharedSvcVnetSubnetPeCidr": {
+                        "value": "[parameters('sharedSvcVnetSubnetPeCidr')]"
+                    },
+                    "transitVnetResourceId": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.transitVnetResourceId.value]"
+                    },
+                    "sharedSubnetCidr": {
+                        "value": "[parameters('sharedSubnetCidr')]"
+                    },
+                    "transitVnetName": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.transitVnetName.value]"
+                    },
+                    "transitRG": {
+                        "value": "[variables('transitRG')]"
+                    },
+                    "vmAdminUsername": {
+                        "value": "[parameters('vmAdminUsername')]"
+                    },
+                    "vmAdminPassword": {
+                        "value": "[parameters('vmAdminPassword')]"
+                    },
+                    "lawWorkspaceId": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.lawWorkspaceId.value]"
+                    },
+                    "lawWorkspaceKey": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.lawWorkspaceKey.value]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('workloadDeploymentName')]",
+            "resourceGroup": "[variables('workloadRG')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/resourceGroups',variables('workloadRG'))]",
+                "[tenantResourceId('Microsoft.Resources/deployments',variables('sharedDeploymentName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('workloadTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[variables('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "adminObjectId": {
+                        "value": "[parameters('adminObjectId')]"
+                    },
+                    "lawResourceId": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.lawResourceId.value]"
+                    },
+                    "firewallIp": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.firewallIp.value]"
+                    },
+                    "workloadVnetCidr": {
+                        "value": "[parameters('workloadVnetCidr')]"
+                    },
+                    "workloadVnetSubnetAppCidr": {
+                        "value": "[parameters('workloadVnetSubnetAppCidr')]"
+                    },
+                    "workloadVnetSubnetDataCidr": {
+                        "value": "[parameters('workloadVnetSubnetDataCidr')]"
+                    },
+                    "workloadVnetSubnetSvcCidr": {
+                        "value": "[parameters('workloadVnetSubnetSvcCidr')]"
+                    },
+                    "transitVnetResourceId": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.transitVnetResourceId.value]"
+                    },
+                    "transitRG": {
+                        "value": "[variables('transitRG')]"
+                    },
+                    "transitVnetName": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.transitVnetName.value]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('flowLogsDeploymentName')]",
+            "resourceGroup": "[parameters('networkWatcherRg')]",
+            "dependsOn": [
+                "[tenantResourceId('Microsoft.Resources/deployments',variables('transitDeploymentName'))]",
+                "[tenantResourceId('Microsoft.Resources/deployments',variables('workloadDeploymentName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('flowLogsTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "lawResourceId": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.lawResourceId.value]"
+                    },
+                    "stResourceId": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.stResourceId.value]"
+                    },
+                    "bastionNsgName": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.bastionNsgName.value]"
+                    },
+                    "bastionNsgResourceId": {
+                        "value": "[reference(variables('transitDeploymentName')).outputs.bastionNsgResourceId.value]"
+                    },
+                    "sharedNsgName": {
+                        "value": "[reference(variables('sharedDeploymentName')).outputs.nsgName.value]"
+                    },
+                    "sharedNsgResourceId": {
+                        "value": "[reference(variables('sharedDeploymentName')).outputs.nsgResourceId.value]"
+                    },
+                    "appNsgName": {
+                        "value": "[reference(variables('workloadDeploymentName')).outputs.appNsgName.value]"
+                    },
+                    "appNsgResourceId": {
+                        "value": "[reference(variables('workloadDeploymentName')).outputs.appNsgResourceId.value]"
+                    },
+                    "dataNsgName": {
+                        "value": "[reference(variables('workloadDeploymentName')).outputs.dataNsgName.value]"
+                    },
+                    "dataNsgResourceId": {
+                        "value": "[reference(variables('workloadDeploymentName')).outputs.dataNsgResourceId.value]"
+                    },
+                    "svcNsgName": {
+                        "value": "[reference(variables('workloadDeploymentName')).outputs.svcNsgName.value]"
+                    },
+                    "svcNsgResourceId": {
+                        "value": "[reference(variables('workloadDeploymentName')).outputs.svcNsgResourceId.value]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('defenderDeploymentName')]",
+            "subscriptionId": "[subscription().subscriptionId]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "type": "Microsoft.Security/autoProvisioningSettings",
+                            "name": "default",
+                            "apiVersion": "2017-08-01-preview",
+                            "properties": {
+                                "autoProvision": "[parameters('autoProvision')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/workspaceSettings",
+                            "apiVersion": "2017-08-01-preview",
+                            "name": "default",
+                            "properties": {
+                                "workspaceId": "[reference(variables('transitDeploymentName')).outputs.lawResourceId.value]",
+                                "scope": "[subscription().id]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "AppServices",
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierAppServices')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "SqlServers",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/AppServices')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierSqlServers')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "SqlServerVirtualMachines",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/SqlServers')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierSqlServerVM')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "StorageAccounts",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/SqlServerVirtualMachines')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierStorageAccounts')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "KubernetesService",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/StorageAccounts')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierK8s')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "ContainerRegistry",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/KubernetesService')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierContainerRegistry')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "KeyVaults",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/ContainerRegistry')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierKeyVaults')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "Arm",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/KeyVaults')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierArm')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "Dns",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/Arm')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierDns')]"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Security/pricings",
+                            "apiVersion": "2022-03-01",
+                            "name": "VirtualMachines",
+                            "dependsOn": [
+                                "[concat('Microsoft.Security/pricings/Dns')]"
+                            ],
+                            "properties": {
+                                "pricingTier": "[parameters('pricingTierVM')]"
+                            }
+                        }
+                    ],
+                    "outputs": {}
+                }
+            }
         }
-        // {
-        //     "type": "Microsoft.Resources/deployments",
-        //     "apiVersion": "2021-04-01",
-        //     "name": "[variables('sharedDeploymentName')]",
-        //     // "resourceGroup": "[concat('rg-shared-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix'))]",
-        //     "resourceGroup": "[variables('sharedRG')]",
-        //     "dependsOn": [
-        //         "[resourceId('Microsoft.Resources/resourceGroups',concat('rg-shared-',parameters('envName'),'-',parameters('location'),'-',parameters('suffix')))]",
-        //         "[resourceId('Microsoft.Resources/deployments',variables('transitDeploymentName'))]"
-        //     ],
-        //     "properties": {
-        //         "mode": "Incremental",
-        //         "templateLink": {
-        //             "uri": "[variables('sharedTemplateUrl')]",
-        //             "contentVersion": "1.0.0.0"
-        //         },
-        //         "parameters": {
-        //             "tags": {
-        //                 "value": "[parameters('tags')]"
-        //             },
-        //             "location": {
-        //                 "value": "[parameters('location')]"
-        //             },
-        //             "makeSuffix": {
-        //                 "value": "[variables('makeSuffix')]"
-        //             },
-        //             "adminObjectId": {
-        //                 "value": "[parameters('adminObjectId')]"
-        //             },
-        //             "lawResourceId": {
-        //                 "value": "[reference(variables('transitDeploymentName')).outputs.lawResourceId.value]"
-        //             },
-        //             "vmAdminUsername": {
-        //                 "type": "[parameters('vmAdminUsername')]"
-        //             },
-        //             "vmAdminPassword": {
-        //                 "type": "[parameters('vmAdminPassword')]"
-        //             }
-        //         }
-        //     }
-        // }
     ],
     "outputs": {
         "transitResourceGroupName": {
@@ -207,6 +540,15 @@
         "sharedResourceGroupName": {
             "type": "string",
             "value": "[variables('sharedRG')]"
+        },
+        "workloadResourceGroupName": {
+            "type": "string",
+            "value": "[variables('workloadRG')]"
         }
+        // ,
+        // "transitVnetResourceId": {
+        //     "type": "string",
+        //     "value": "[reference(variables('transitDeploymentName')).outputs.transitVnetResourceId.value]"
+        // }
     }
 }

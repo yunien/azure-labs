@@ -46,6 +46,19 @@
                     "validationMessage": "NetworkWatcher resource group name."
                 },
                 "visible": true
+            },
+            {
+                "name": "adminObjectId",
+                "type": "Microsoft.Common.TextBox",
+                "label": "admin Object Id",
+                "toolTip": "The object ID of the user or group. Object Id in AAD",
+                "defaultValue": "50bc59ae-70d3-4cc3-8541-7bd5a1237212",
+                "constraints": {
+                    "required": true,
+                    "regex": "^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$",
+                    "validationMessage": "should be Object Id in AAD"
+                },
+                "visible": true
             }
         ],
         "steps": [
@@ -53,6 +66,32 @@
                 "name": "transit",
                 "label": "services in transit rg",
                 "elements": [
+                    {
+                        "name": "onPremisesAddressSpace",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "onPremises address space",
+                        "defaultValue": "192.168.0.0/16",
+                        "toolTip": "onPremises address space",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "cloudAddressSpace",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "cloud address space",
+                        "defaultValue": "10.0.0.0/8",
+                        "toolTip": "cloud address space",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
+                        },
+                        "visible": true
+                    },
                     {
                         "name": "transitVnetCidr",
                         "type": "Microsoft.Common.TextBox",
@@ -112,28 +151,54 @@
                 "label": "services in shared rg",
                 "elements": [
                     {
-                        "name": "adminObjectId",
+                        "name": "sharedSvcVnetCidr",
                         "type": "Microsoft.Common.TextBox",
-                        "label": "admin Object Id",
-                        "toolTip": "The object ID of the user or group. Object Id in AAD",
-                        "defaultValue": "50bc59ae-70d3-4cc3-8541-7bd5a1237212",
+                        "label": "shared Vnet Cidr",
+                        "defaultValue": "10.1.0.0/16",
+                        "toolTip": "shared Vnet Cidr",
                         "constraints": {
                             "required": true,
-                            "regex": "^[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}$",
-                            "validationMessage": "should be Object Id in AAD"
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "sharedSubnetCidr",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "shared subnet Cidr",
+                        "defaultValue": "10.1.0.0/24",
+                        "toolTip": "shared subnet Cidr",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "sharedSvcVnetSubnetPeCidr",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "shared subnet private endpoint Cidr",
+                        "defaultValue": "10.1.2.0/24",
+                        "toolTip": "shared subnet private endpoint Cidr",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
                         },
                         "visible": true
                     },
                     {
                         "name": "vmAdminUsername",
                         "type": "Microsoft.Common.TextBox",
-                        "label": "vm Admin User Name",
-                        "toolTip": "vm user name in shared rg",
+                        "label": "vm admin username",
                         "defaultValue": "",
+                        "toolTip": "vm admin username",
                         "constraints": {
                             "required": true,
-                            "regex": "^[A-Za-z0-9]+$",
-                            "validationMessage": "keyin user name"
+                            "regex": "[A-Za-z0-9]{1,}",
+                            "validationMessage": "user name"
                         },
                         "visible": true
                     },
@@ -141,33 +206,311 @@
                         "name": "vmAdminPassword",
                         "type": "Microsoft.Common.PasswordBox",
                         "label": {
-                            "password": "vm user Password",
-                            "confirmPassword": "Confirm vm user password"
+                            "password": "vm admin password"
                         },
-                        "toolTip": "vm user password in shared rg",
+                        "toolTip": "vm admin password",
                         "constraints": {
                             "required": true,
-                            "regex": "^[a-zA-Z0-9]{8,}$",
-                            "validationMessage": "Password must be at least 8 characters long, contain only numbers and letters"
+                            "regex": "",
+                            "validationMessage": "user password"
+                        },
+                        "options": {
+                            "hideConfirmation": true
                         },
                         "visible": true
                     }
                 ]
             },
             {
-                "name": "workloadVnet",
-                "label": "workload Vnet",
+                "name": "workload",
+                "label": "services in workload rg",
                 "elements": [
                     {
-                        "name": "workloadRegion",
+                        "name": "workloadVnetCidr",
                         "type": "Microsoft.Common.TextBox",
-                        "label": "workload region",
-                        "defaultValue": "eastus",
-                        "toolTip": "default is resource group location",
+                        "label": "workload Vnet Cidr",
+                        "defaultValue": "10.2.0.0/16",
+                        "toolTip": "workload Vnet Cidr",
                         "constraints": {
                             "required": true,
-                            "regex": "^[A-Za-z0-9 ]+$",
-                            "validationMessage": "should be location"
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "workloadVnetSubnetAppCidr",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "workload app subnet Cidr",
+                        "defaultValue": "10.2.0.0/24",
+                        "toolTip": "workload app subnet Cidr",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "workloadVnetSubnetDataCidr",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "workload data subnet Cidr",
+                        "defaultValue": "10.2.1.0/24",
+                        "toolTip": "workload data subnet Cidr",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "workloadVnetSubnetSvcCidr",
+                        "type": "Microsoft.Common.TextBox",
+                        "label": "workload svc subnet Cidr",
+                        "defaultValue": "10.2.2.0/24",
+                        "toolTip": "workload svc subnet Cidr",
+                        "constraints": {
+                            "required": true,
+                            "regex": "^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}\/[0-9]{1,2}",
+                            "validationMessage": "should be xx.xx.xx.xx/xx"
+                        },
+                        "visible": true
+                    }
+                ]
+            },
+            {
+                "name": "defender",
+                "label": "defender plans for cloud",
+                "elements": [
+                    {
+                        "name": "pricingTierAppServices",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for appServices",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for appServices",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierSqlServers",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for SqlServers",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for SqlServers",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierSqlServerVM",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for SqlServer VM",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for SqlServer VM",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierStorageAccounts",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for storage accounts",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for storage accounts",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierK8s",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for K8S",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for K8S",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierContainerRegistry",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for container registry",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for container registry",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierKeyVaults",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for key vaults",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for key vaults",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierArm",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for arm",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for arm",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierDns",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for DNS",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for DNS",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "pricingTierVM",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "pricing Tier for VM",
+                        "defaultValue": "Standard",
+                        "toolTip": "pricing Tier for VM",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "Standard",
+                                    "value": "Standard"
+                                },
+                                {
+                                    "label": "Free",
+                                    "value": "Free"
+                                }
+                            ],
+                            "required": true
+                        },
+                        "visible": true
+                    },
+                    {
+                        "name": "autoProvision",
+                        "type": "Microsoft.Common.DropDown",
+                        "label": "Log Analytics agent - auto Provision",
+                        "defaultValue": "On",
+                        "toolTip": "Log Analytics agent - auto Provision",
+                        "constraints": {
+                            "allowedValues": [
+                                {
+                                    "label": "On",
+                                    "value": "On"
+                                },
+                                {
+                                    "label": "Off",
+                                    "value": "Off"
+                                }
+                            ],
+                            "required": true
                         },
                         "visible": true
                     }
@@ -178,14 +521,33 @@
             "envName": "[basics('envName')]",
             "suffix": "[basics('suffix')]",
             "networkWatcherRg": "[basics('networkWatcherRg')]",
+            "adminObjectId": "[basics('adminObjectId')]",
+            "onPremisesAddressSpace": "[steps('transit').onPremisesAddressSpace]",
+            "cloudAddressSpace": "[steps('transit').cloudAddressSpace]",
             "transitVnetCidr": "[steps('transit').transitVnetCidr]",
             "transitGatewaySubnetCidr": "[steps('transit').transitGatewaySubnetCidr]",
             "transitBastionSubnetCidr": "[steps('transit').transitBastionSubnetCidr]",
             "transitFwSubnetCidr": "[steps('transit').transitFwSubnetCidr]",
-            "adminObjectId": "[steps('shared').adminObjectId]",
+            "sharedSvcVnetCidr": "[steps('shared').sharedSvcVnetCidr]",
+            "sharedSubnetCidr": "[steps('shared').sharedSubnetCidr]",
+            "sharedSvcVnetSubnetPeCidr": "[steps('shared').sharedSvcVnetSubnetPeCidr]",
             "vmAdminUsername": "[steps('shared').vmAdminUsername]",
             "vmAdminPassword": "[steps('shared').vmAdminPassword]",
-            "workloadRegion": "[steps('workloadVnet').workloadRegion]",
+            "workloadVnetCidr": "[steps('workload').workloadVnetCidr]",
+            "workloadVnetSubnetAppCidr": "[steps('workload').workloadVnetSubnetAppCidr]",
+            "workloadVnetSubnetDataCidr": "[steps('workload').workloadVnetSubnetDataCidr]",
+            "workloadVnetSubnetSvcCidr": "[steps('workload').workloadVnetSubnetSvcCidr]",
+            "pricingTierAppServices": "[steps('defender').pricingTierAppServices]",
+            "pricingTierSqlServers": "[steps('defender').pricingTierSqlServers]",
+            "pricingTierSqlServerVM": "[steps('defender').pricingTierSqlServerVM]",
+            "pricingTierStorageAccounts": "[steps('defender').pricingTierStorageAccounts]",
+            "pricingTierK8s": "[steps('defender').pricingTierK8s]",
+            "pricingTierContainerRegistry": "[steps('defender').pricingTierContainerRegistry]",
+            "pricingTierKeyVaults": "[steps('defender').pricingTierKeyVaults]",
+            "pricingTierArm": "[steps('defender').pricingTierArm]",
+            "pricingTierDns": "[steps('defender').pricingTierDns]",
+            "pricingTierVM": "[steps('defender').pricingTierVM]",
+            "autoProvision": "[steps('defender').autoProvision]",
             "location": "[location()]"
         }
     }

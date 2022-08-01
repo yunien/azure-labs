@@ -1,0 +1,210 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        },
+        "sharedSvcDevSubnetResourceId": {
+            "type": "string"
+        },
+        "vmAdminUsername": {
+            "type": "string"
+        },
+        "vmAdminPassword": {
+            "type": "securestring"
+        },
+        "lawWorkspaceId": {
+            "type": "string"
+        },
+        "lawWorkspaceKey": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "vmName": "[concat('linux-vm-',parameters('makeSuffix'))]",
+        "nicName": "[concat('nic-',variables('vmName'))]",
+        "ipConfigName": "[concat('ipconfig-',variables('vmName'))]",
+        "serverIpAddress": "10.1.0.5",
+        "vmSku": "Standard_D4s_v5",
+        "osDiskType": "StandardSSD_LRS",
+        "scriptName": "prepare_ubuntu_dev_vm.sh",
+        "scriptUrl": "[uri(deployment().properties.templateLink.uri, 'scripts/prepare_ubuntu_dev_vm.sh')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('nicName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "[variables('ipConfigName')]",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[variables('serverIpAddress')]",
+                            "subnet": {
+                                "id": "[parameters('sharedSvcDevSubnetResourceId')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2022-03-01",
+            "name": "[variables('vmName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
+            ],
+            "properties": {
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                },
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSku')]"
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "adminPassword": "[parameters('vmAdminPassword')]",
+                    "adminUsername": "[parameters('vmAdminUsername')]",
+                    "computerName": "[take(variables('vmName'),15)]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": false,
+                        "provisionVMAgent": true
+                    }
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "offer": "UbuntuServer",
+                        "publisher": "Canonical",
+                        "sku": "18.04-LTS",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "createOption": "fromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[variables('osDiskType')]"
+                        }
+                    }
+                }
+            },
+            "resources": [
+                {
+                    "type": "Microsoft.Compute/virtualMachines/extensions",
+                    "apiVersion": "2022-03-01",
+                    "name": "[concat(variables('vmName'),'/CustomScriptExtension')]",
+                    "location": "[parameters('location')]",
+                    "tags": "[parameters('tags')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines',variables('vmName'))]"
+                    ],
+                    "properties": {
+                        "autoUpgradeMinorVersion": true,
+                        "protectedSettings": {
+                            "fileUris": [
+                                "[variables('scriptUrl')]"
+                            ],
+                            "commandToExecute": "[concat('sh ', variables('scriptName'), ' ', parameters('vmAdminUsername'))]"
+                        },
+                        "publisher": "Microsoft.Azure.Extensions",
+                        "settings": {},
+                        "type": "CustomScript",
+                        "typeHandlerVersion": "2.1"
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "Microsoft.Azure.NetworkWatcher",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines',variables('vmName'))]",
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/CustomScriptExtension')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Azure.NetworkWatcher",
+                        "type": "NetworkWatcherAgentLinux",
+                        "typeHandlerVersion": "1.4",
+                        "autoUpgradeMinorVersion": true
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "OMSExtension",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines',variables('vmName'))]",
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/Microsoft.Azure.NetworkWatcher')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.EnterpriseCloud.Monitoring",
+                        "type": "OmsAgentForLinux",
+                        "typeHandlerVersion": "1.13",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "workspaceId": "[parameters('lawWorkspaceId')]",
+                            "stopOnMultipleConnections": true
+                        },
+                        "protectedSettings": {
+                            "workspaceKey": "[parameters('lawWorkspaceKey')]"
+                        }
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "DependencyAgentLinux",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines',variables('vmName'))]",
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/OMSExtension')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Azure.Monitoring.DependencyAgent",
+                        "type": "DependencyAgentLinux",
+                        "typeHandlerVersion": "9.5",
+                        "autoUpgradeMinorVersion": true
+                    }
+                },
+                {
+                    "type": "extensions",
+                    "name": "AzureMonitorLinuxAgent",
+                    "apiVersion": "2022-03-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines',variables('vmName'))]",
+                        "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'), '/extensions/DependencyAgentLinux')]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Azure.Monitor",
+                        "type": "AzureMonitorLinuxAgent",
+                        "typeHandlerVersion": "1.5",
+                        "autoUpgradeMinorVersion": true,
+                        "enableAutomaticUpgrade": true
+                    }
+                }
+            ]
+        }
+    ]
+}

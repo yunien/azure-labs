@@ -1,0 +1,255 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "type": "object"
+        },
+        "makeSuffix": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        },
+        "firewallIp": {
+            "type": "string"
+        },
+        "workloadVnetCidr": {
+            "type": "string"
+        },
+        "workloadVnetSubnetAppCidr": {
+            "type": "string"
+        },
+        "workloadVnetSubnetDataCidr": {
+            "type": "string"
+        },
+        "workloadVnetSubnetSvcCidr": {
+            "type": "string"
+        },
+        "transitVnetResourceId": {
+            "type": "string"
+        },
+        "transitRG": {
+            "type": "string"
+        },
+        "transitVnetName": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "appNsgName": "[concat('nsg-app-',parameters('makeSuffix'))]",
+        "dataNsgName": "[concat('nsg-data-',parameters('makeSuffix'))]",
+        "svcNsgName": "[concat('nsg-svc-',parameters('makeSuffix'))]",
+        "workloadAppRouteTableName": "[concat('rt-app-',parameters('makeSuffix'))]",
+        "workloadDataRouteTableName": "[concat('rt-data-',parameters('makeSuffix'))]",
+        "workloadVnetName": "[concat('vnet-workload-', parameters('makeSuffix'))]",
+        "workloadAppSubnetName": "[concat('sub-snet-app-', parameters('makeSuffix'))]",
+        "workloadDataSubnetName": "[concat('sub-snet-data-', parameters('makeSuffix'))]",
+        "workloadVnetSvcSubnetName": "[concat('sub-snet-svc-', parameters('makeSuffix'))]",
+        "workloadToTransitPeeringName": "peerworkloadtotransit",
+        "transitToWorkloadPeeringName": "peertransittoworkload"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('appNsgName')]",
+            "apiVersion": "2021-08-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]"
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('dataNsgName')]",
+            "apiVersion": "2021-08-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]"
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('svcNsgName')]",
+            "apiVersion": "2021-08-01",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]"
+        },
+        {
+            "type": "Microsoft.Network/routeTables",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('workloadAppRouteTableName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "disableBgpRoutePropagation": true,
+                "routes": [
+                    {
+                        "name": "udr-default",
+                        "properties": {
+                            "addressPrefix": "0.0.0.0/0",
+                            "hasBgpOverride": false,
+                            "nextHopIpAddress": "[parameters('firewallIp')]",
+                            "nextHopType": "VirtualAppliance"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/routeTables",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('workloadDataRouteTableName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "disableBgpRoutePropagation": true,
+                "routes": [
+                    {
+                        "name": "udr-default",
+                        "properties": {
+                            "addressPrefix": "0.0.0.0/0",
+                            "hasBgpOverride": false,
+                            "nextHopIpAddress": "[parameters('firewallIp')]",
+                            "nextHopType": "VirtualAppliance"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('workloadVnetName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/routeTables',variables('workloadAppRouteTableName'))]",
+                "[resourceId('Microsoft.Network/routeTables',variables('workloadDataRouteTableName'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [ "[parameters('workloadVnetCidr')]" ]
+                },
+                "enableDdosProtection": false,
+                "enableVmProtection": false,
+                "subnets": [
+                    {
+                        "name": "[variables('workloadAppSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('workloadVnetSubnetAppCidr')]",
+                            "routeTable": {
+                                "id": "[resourceId('Microsoft.Network/routeTables',variables('workloadAppRouteTableName'))]"
+                            },
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('appNsgName'))]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[variables('workloadDataSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('workloadVnetSubnetDataCidr')]",
+                            "routeTable": {
+                                "id": "[resourceId('Microsoft.Network/routeTables',variables('workloadDataRouteTableName'))]"
+                            },
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataNsgName'))]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[variables('workloadVnetSvcSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('workloadVnetSubnetSvcCidr')]",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('svcNsgName'))]"
+                            },
+                            "privateEndpointNetworkPolicies": "Disabled"
+                        }
+                    }
+                ]
+            },
+            "resources": [
+                {
+                    "name": "[variables('workloadToTransitPeeringName')]",
+                    "type": "virtualNetworkPeerings",
+                    "apiVersion": "2021-08-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Network/virtualNetworks',variables('workloadVnetName'))]"
+                    ],
+                    "properties": {
+                        "allowVirtualNetworkAccess": true,
+                        "allowForwardedTraffic": true,
+                        "allowGatewayTransit": false,
+                        "useRemoteGateways": false,
+                        "remoteVirtualNetwork": {
+                            "id": "[parameters('transitVnetResourceId')]"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('transitToWorkloadPeeringName')]",
+            "resourceGroup": "[parameters('transitRG')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks',variables('workloadVnetName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "variables": {},
+                    "resources": [
+                        {
+                            "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+                            "apiVersion": "2021-08-01",
+                            "name": "[concat(parameters('transitVnetName'), '/', variables('transitToWorkloadPeeringName'))]",
+                            "properties": {
+                                "allowForwardedTraffic": true,
+                                "allowGatewayTransit": true,
+                                "allowVirtualNetworkAccess": true,
+                                "remoteVirtualNetwork": {
+                                    "id": "[resourceId('Microsoft.Network/virtualNetworks',variables('workloadVnetName'))]"
+                                },
+                                "useRemoteGateways": false
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "workloadVnetNameResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/virtualNetworks',variables('workloadVnetName'))]"
+        },
+        "appNsgName": {
+            "type": "string",
+            "value": "[variables('appNsgName')]"
+        },
+        "appNsgResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('appNsgName'))]"
+        },
+        "dataNsgName": {
+            "type": "string",
+            "value": "[variables('dataNsgName')]"
+        },
+        "dataNsgResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('dataNsgName'))]"
+        },
+        "svcNsgName": {
+            "type": "string",
+            "value": "[variables('svcNsgName')]"
+        },
+        "svcNsgResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('svcNsgName'))]"
+        }
+    }
+}

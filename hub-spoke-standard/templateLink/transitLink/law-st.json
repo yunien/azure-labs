@@ -126,6 +126,10 @@
             "type": "string",
             "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces',variables('laWorkspaceName')),'2021-06-01').customerId]"
         },
+        "logAnalyticsWorkspaceKey": {
+            "type": "string",
+            "value": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', variables('laWorkspaceName')), '2021-06-01').primarySharedKey]"
+        },
         "storageResourceId": {
             "type": "string",
             "value": "[resourceId('Microsoft.Storage/storageAccounts',variables('storageName'))]"

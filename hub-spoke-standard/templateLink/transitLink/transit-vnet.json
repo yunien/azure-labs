@@ -26,61 +26,214 @@
     },
     "variables": {
         "transitVnetName": "[concat('vnet-transit-', parameters('makeSuffix'))]",
+        "bastionNsgName": "[concat('nsg-bst-', parameters('makeSuffix'))]",
         "gatewaySubnetName": "GatewaySubnet",
         "bastionSubnetName": "AzureBastionSubnet",
         "fwPayloadSubnetName": "AzureFirewallSubnet"
     },
     "resources": [
         {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2021-08-01",
+            "name": "[variables('bastionNsgName')]",
+            "location": "[parameters('location')]",
+            "tags": "[parameters('tags')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "AllowHttps",
+                        "properties": {
+                            "priority": 100,
+                            "access": "Allow",
+                            "description": "Allow incoming HTTPS traffic from Internet",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "Internet",
+                            "destinationAddressPrefix": "*",
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "AllowControlPlane",
+                        "properties": {
+                            "priority": 101,
+                            "access": "Allow",
+                            "description": "Allow control plane traffic",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRanges": [
+                                "443"
+                            ],
+                            "sourceAddressPrefix": "GatewayManager",
+                            "destinationAddressPrefix": "*",
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "AllowDataPlane",
+                        "properties": {
+                            "priority": 102,
+                            "access": "Allow",
+                            "description": "Allows Azure Bastion data plane traffic",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRanges": [
+                                "8080",
+                                "5701"
+                            ],
+                            "sourceAddressPrefix": "VirtualNetwork",
+                            "destinationAddressPrefix": "VirtualNetwork",
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "AllowHealthProbes",
+                        "properties": {
+                            "priority": 103,
+                            "access": "Allow",
+                            "description": "Allows health probes from Azure Load Balancer",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "AzureLoadBalancer",
+                            "destinationAddressPrefix": "*",
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "DenyAllInbound",
+                        "properties": {
+                            "priority": 1000,
+                            "access": "Deny",
+                            "description": "Deny all inbound traffic",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "AllowOutboundDataPlane",
+                        "properties": {
+                            "priority": 100,
+                            "access": "Allow",
+                            "description": "Allows Azure Bastion data plane traffic",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRanges": [
+                                "8080",
+                                "5701"
+                            ],
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "AzureCloud",
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "AllowOutboundAzureCloud",
+                        "properties": {
+                            "priority": 101,
+                            "access": "Allow",
+                            "description": "Allows Bastion hosts to communicate with management components",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "AzureCloud",
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "AllowOutboundInternet",
+                        "properties": {
+                            "priority": 102,
+                            "access": "Allow",
+                            "description": "Allows Bastion to validate certificates",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "80",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "AllowOutboundVirtualNetwork",
+                        "properties": {
+                            "priority": 103,
+                            "access": "Allow",
+                            "description": "Allows Bastion to connect to VMs over SSH and RDP",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRanges": [
+                                "3389",
+                                "22"
+                            ],
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "VirtualNetwork",
+                            "direction": "Outbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
             "type": "Microsoft.Network/virtualNetworks",
             "apiVersion": "2021-08-01",
             "name": "[variables('transitVnetName')]",
             "location": "[parameters('location')]",
             "tags": "[parameters('tags')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups',variables('bastionNsgName'))]"
+            ],
             "properties": {
                 "addressSpace": {
                     "addressPrefixes": [ "[parameters('transitVnetCidr')]" ]
                 },
                 "enableDdosProtection": false,
-                "enableVmProtection": false
-            }
-        },
-        {
-            "comments": "gateway subnet",
-            "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnetName'), '/', variables('gatewaySubnetName'))]",
-            "apiVersion": "2021-08-01",
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks', variables('transitVnetName'))]"
-            ],
-            "properties": {
-                "addressPrefix": "[parameters('transitGatewaySubnetCidr')]"
-            }
-        },
-        {
-            "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnetName'), '/', variables('bastionSubnetName'))]",
-            "apiVersion": "2021-08-01",
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('gatewaySubnetName'))]"
-            ],
-            "properties": {
-                "addressPrefix": "[parameters('transitBastionSubnetCidr')]"
-            }
-        },
-        {
-            "type": "Microsoft.Network/virtualNetworks/subnets",
-            "name": "[concat(variables('transitVnetName'), '/', variables('fwPayloadSubnetName'))]",
-            "apiVersion": "2021-08-01",
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('bastionSubnetName'))]"
-            ],
-            "properties": {
-                "addressPrefix": "[parameters('transitFwSubnetCidr')]"
+                "enableVmProtection": false,
+                "subnets": [
+                    {
+                        "name": "[variables('gatewaySubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('transitGatewaySubnetCidr')]"
+                        }
+                    },
+                    {
+                        "name": "[variables('bastionSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('transitBastionSubnetCidr')]",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('bastionNsgName'))]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[variables('fwPayloadSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('transitFwSubnetCidr')]"
+                        }
+                    }
+                ]
             }
         }
     ],
     "outputs": {
+        "bastionNsgName": {
+            "type": "string",
+            "value": "[variables('bastionNsgName')]"
+        },
+        "bastionNsgResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('bastionNsgName'))]"
+        },
+        "transitVnetName": {
+            "type": "string",
+            "value": "[variables('transitVnetName')]"
+        },
         "bastionSubnetId": {
             "type": "string",
             "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('bastionSubnetName'))]"
@@ -88,6 +241,10 @@
         "fwPayloadSubnetId": {
             "type": "string",
             "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('transitVnetName'), variables('fwPayloadSubnetName'))]"
+        },
+        "transitVnetResourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Network/virtualNetworks',variables('transitVnetName'))]"
         }
     }
 }

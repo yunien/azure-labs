@@ -5,10 +5,10 @@
         "tags": {
             "type": "object"
         },
-        "location": {
+        "makeSuffix": {
             "type": "string"
         },
-        "makeSuffix": {
+        "location": {
             "type": "string"
         },
         "adminObjectId": {
@@ -17,16 +17,49 @@
         "lawResourceId": {
             "type": "string"
         },
+        "firewallIp": {
+            "type": "string"
+        },
+        "sharedSvcVnetCidr": {
+            "type": "string"
+        },
+        "sharedSvcVnetSubnetPeCidr": {
+            "type": "string"
+        },
+        "transitVnetResourceId": {
+            "type": "string"
+        },
+        "sharedSubnetCidr": {
+            "type": "string"
+        },
+        "transitVnetName": {
+            "type": "string"
+        },
+        "transitRG": {
+            "type": "string"
+        },
         "vmAdminUsername": {
             "type": "string"
         },
         "vmAdminPassword": {
             "type": "securestring"
+        },
+        "lawWorkspaceId": {
+            "type": "string"
+        },
+        "lawWorkspaceKey": {
+            "type": "string"
         }
     },
     "variables": {
         "deployKeyVaultCentral": "[concat('deploy-keyvault-central-', parameters('makeSuffix'))]",
-        "deployKeyVaultCentralTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'sharedLink/key-vault.json')]"
+        "deployKeyVaultCentralTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'sharedLink/key-vault.json')]",
+        "deploySharedVnet": "[concat('deploy-shared-vnet-', parameters('makeSuffix'))]",
+        "deploySharedVnetTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'sharedLink/shared-vnet.json')]",
+        "deployLinuxVM": "[concat('deploy-linux-vm-', parameters('makeSuffix'))]",
+        "deployLinuxVMTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'sharedLink/ubuntu-vm.json')]",
+        "deployWindowsVM": "[concat('deploy-windows-vm-', parameters('makeSuffix'))]",
+        "deployWindowsVMTemplateUrl": "[uri(deployment().properties.templateLink.uri, 'sharedLink/windows-vm.json')]"
     },
     "resources": [
         {
@@ -49,21 +82,150 @@
                     "location": {
                         "value": "[parameters('location')]"
                     },
-                    "keyVaultAdminObjectId": {
+                    "adminObjectId": {
                         "value": "[parameters('adminObjectId')]"
                     },
                     "lawResourceId": {
                         "value": "[parameters('lawResourceId')]"
                     },
                     "vmAdminUsername": {
-                        "type": "[parameters('vmAdminUsername')]"
+                        "value": "[parameters('vmAdminUsername')]"
                     },
                     "vmAdminPassword": {
-                        "type": "[parameters('vmAdminPassword')]"
+                        "value": "[parameters('vmAdminPassword')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deploySharedVnet')]",
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deploySharedVnetTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[parameters('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "firewallIp": {
+                        "value": "[parameters('firewallIp')]"
+                    },
+                    "sharedSvcVnetCidr": {
+                        "value": "[parameters('sharedSvcVnetCidr')]"
+                    },
+                    "sharedSvcVnetSubnetPeCidr": {
+                        "value": "[parameters('sharedSvcVnetSubnetPeCidr')]"
+                    },
+                    "transitVnetResourceId": {
+                        "value": "[parameters('transitVnetResourceId')]"
+                    },
+                    "sharedSubnetCidr": {
+                        "value": "[parameters('sharedSubnetCidr')]"
+                    },
+                    "transitVnetName": {
+                        "value": "[parameters('transitVnetName')]"
+                    },
+                    "transitRG": {
+                        "value": "[parameters('transitRG')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deployLinuxVM')]",
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deployLinuxVMTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[parameters('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "sharedSvcDevSubnetResourceId": {
+                        "value": "[reference(variables('deploySharedVnet')).outputs.sharedSvcDevSubnetResourceId.value]"
+                    },
+                    "vmAdminUsername": {
+                        "value": "[parameters('vmAdminUsername')]"
+                    },
+                    "vmAdminPassword": {
+                        "value": "[parameters('vmAdminPassword')]"
+                    },
+                    "lawWorkspaceId": {
+                        "value": "[parameters('lawWorkspaceId')]"
+                    },
+                    "lawWorkspaceKey": {
+                        "value": "[parameters('lawWorkspaceKey')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('deployWindowsVM')]",
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deployWindowsVMTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "tags": {
+                        "value": "[parameters('tags')]"
+                    },
+                    "makeSuffix": {
+                        "value": "[parameters('makeSuffix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "sharedSvcDevSubnetResourceId": {
+                        "value": "[reference(variables('deploySharedVnet')).outputs.sharedSvcDevSubnetResourceId.value]"
+                    },
+                    "vmAdminUsername": {
+                        "value": "[parameters('vmAdminUsername')]"
+                    },
+                    "vmAdminPassword": {
+                        "value": "[parameters('vmAdminPassword')]"
+                    },
+                    "lawWorkspaceId": {
+                        "value": "[parameters('lawWorkspaceId')]"
+                    },
+                    "lawWorkspaceKey": {
+                        "value": "[parameters('lawWorkspaceKey')]"
                     }
                 }
             }
         }
     ],
-    "outputs": {}
+    "outputs": {
+        "nsgName": {
+            "type": "string",
+            "value": "[reference(variables('deploySharedVnet')).outputs.nsgName.value]"
+        },
+        "nsgResourceId": {
+            "type": "string",
+            "value": "[reference(variables('deploySharedVnet')).outputs.nsgResourceId.value]"
+        }
+    }
 }
